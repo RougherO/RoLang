@@ -1,4 +1,4 @@
-package tokens
+package token
 
 type TokenType uint
 
@@ -37,14 +37,49 @@ const (
 	RBRACE // "}"
 
 	// Keywords
-	FN    // "fn"
-	RET   // "return"
-	LET   // "let"
-	TRUE  // "true"
-	FALSE // "false"
-	IF    // "if"
-	ELSE  // "else"
+	FN     // "fn"
+	RETURN // "return"
+	LET    // "let"
+	TRUE   // "true"
+	FALSE  // "false"
+	IF     // "if"
+	ELSE   // "else"
+
+	TOTAL // total number of tokens
 )
+
+var TokenString = []string{
+	EOF:    "eof",
+	ERR:    "error",
+	IDENT:  "identifier",
+	INT:    "integer",
+	FLOAT:  "float",
+	ASSIGN: "=",
+	PLUS:   "+",
+	MINUS:  "-",
+	BANG:   "!",
+	STAR:   "*",
+	SLASH:  "/",
+	LT:     "<",
+	GT:     ">",
+	EQ:     "==",
+	NE:     "!=",
+	LE:     "<=",
+	GE:     ">=",
+	COMMA:  ",",
+	SEMCOL: ";",
+	LPAREN: "(",
+	RPAREN: ")",
+	LBRACE: "{",
+	RBRACE: "}",
+	FN:     "fn",
+	RETURN: "return",
+	LET:    "let",
+	TRUE:   "true",
+	FALSE:  "false",
+	IF:     "if",
+	ELSE:   "else",
+}
 
 type Token struct {
 	Loc  SrcLoc
@@ -54,7 +89,7 @@ type Token struct {
 
 var keywords = map[string]TokenType{
 	"fn":     FN,
-	"return": RET,
+	"return": RETURN,
 	"let":    LET,
 	"true":   TRUE,
 	"false":  FALSE,

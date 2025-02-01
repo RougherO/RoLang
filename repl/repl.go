@@ -2,7 +2,7 @@ package repl
 
 import (
 	"RoLang/lexer"
-	"RoLang/tokens"
+	"RoLang/token"
 
 	"bufio"
 	"fmt"
@@ -25,7 +25,7 @@ func Start(in io.Reader, out io.Writer) {
 		line := scanner.Text()
 		lexer := lexer.New("repl", line)
 
-		for tok := lexer.NextToken(); tok.Type != tokens.EOF; tok = lexer.NextToken() {
+		for tok := lexer.NextToken(); tok.Type != token.EOF; tok = lexer.NextToken() {
 			fmt.Printf("%+v\n", tok)
 		}
 	}

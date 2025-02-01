@@ -1,7 +1,7 @@
 package lexer
 
 import (
-	"RoLang/tokens"
+	"RoLang/token"
 	"fmt"
 )
 
@@ -15,68 +15,76 @@ type Lexer struct {
 }
 
 func New(file, input string) *Lexer {
-	l := &Lexer{file: file, input: input} // allocating on heap
-	l.readChar()                          // read the first char
+	// Allocating on heap
+	l := &Lexer{
+		file:  file,
+		input: input,
+		line:  1,
+		col:   1,
+	}
+
+	// Read the first char to set the state
+	l.readChar()
 	return l
 }
 
-func (l *Lexer) NextToken() tokens.Token {
-	var tok tokens.Token
+func (l *Lexer) NextToken() token.Token {
+	var tok token.Token
 
 	l.skipWhiteSpace()
 
 	switch l.char {
 	case ';':
-		tok = l.makeToken(tokens.SEMCOL, ";")
+		tok = l.makeToken(token.SEMCOL, ";")
 	case '(':
-		tok = l.makeToken(tokens.LPAREN, "(")
+		tok = l.makeToken(token.LPAREN, "(")
 	case ')':
-		tok = l.makeToken(tokens.RPAREN, ")")
+		tok = l.makeToken(token.RPAREN, ")")
 	case '{':
-		tok = l.makeToken(tokens.LBRACE, "{")
+		tok = l.makeToken(token.LBRACE, "{")
 	case '}':
-		tok = l.makeToken(tokens.RBRACE, "}")
+		tok = l.makeToken(token.RBRACE, "}")
 	case ',':
-		tok = l.makeToken(tokens.COMMA, ",")
+		tok = l.makeToken(token.COMMA, ",")
 	case '+':
-		tok = l.makeToken(tokens.PLUS, "+")
+		tok = l.makeToken(token.PLUS, "+")
 	case '-':
-		tok = l.makeToken(tokens.MINUS, "-")
+		tok = l.makeToken(token.MINUS, "-")
 	case '*':
-		tok = l.makeToken(tokens.STAR, "*")
+		tok = l.makeToken(token.STAR, "*")
 	case '/':
-		tok = l.makeToken(tokens.SLASH, "/")
+		tok = l.makeToken(token.SLASH, "/")
 	case '=':
 		if l.peekChar() == '=' {
 			l.readChar()
-			tok = l.makeToken(tokens.EQ, "==")
+			tok = l.makeToken(token.EQ, "==")
 		} else {
-			tok = l.makeToken(tokens.ASSIGN, "=")
+			tok = l.makeToken(token.ASSIGN, "=")
 		}
 	case '!':
 		if l.peekChar() == '=' {
 			l.readChar()
-			tok = l.makeToken(tokens.NE, "!=")
+			tok = l.makeToken(token.NE, "!=")
 		} else {
-			tok = l.makeToken(tokens.BANG, "!")
+			tok = l.makeToken(token.BANG, "!")
 		}
 	case '<':
 		if l.peekChar() == '=' {
 			l.readChar()
-			tok = l.makeToken(tokens.LE, "<=")
+			tok = l.makeToken(token.LE, "<=")
 		} else {
-			tok = l.makeToken(tokens.LT, "<")
+			tok = l.makeToken(token.LT, "<")
 		}
 	case '>':
 		if l.peekChar() == '=' {
 			l.readChar()
-			tok = l.makeToken(tokens.GE, ">=")
+			tok = l.makeToken(token.GE, ">=")
 		} else {
-			tok = l.makeToken(tokens.GT, ">")
+			tok = l.makeToken(token.GT, ">")
 		}
 	case 0:
 		tok.Word = "EOF"
-		tok.Type = tokens.EOF
+		tok.Type = token.EOF
 	default:
 		if isAlpha(l.char) { // check [A-Za-z_]
 			tok = l.readIdent()
@@ -94,9 +102,9 @@ func (l *Lexer) NextToken() tokens.Token {
 	return tok
 }
 
-func (l *Lexer) makeToken(tokenType tokens.TokenType, word string) tokens.Token {
-	token := tokens.Token{
-		Loc: tokens.SrcLoc{
+func (l *Lexer) makeToken(tokenType token.TokenType, word string) token.Token {
+	token := token.Token{
+		Loc: token.SrcLoc{
 			File: l.file, // current file
 			Line: l.line, // current line
 			Col:  l.col,  // current column
@@ -109,20 +117,20 @@ func (l *Lexer) makeToken(tokenType tokens.TokenType, word string) tokens.Token 
 	return token
 }
 
-func (l *Lexer) makeErr(message string) tokens.Token {
-	return tokens.Token{
-		Loc: tokens.SrcLoc{
+func (l *Lexer) makeErr(message string) token.Token {
+	return token.Token{
+		Loc: token.SrcLoc{
 			File: l.file, // current file
 			Line: l.line, // current line
 			Col:  l.col,  // current column
 		},
-		Type: tokens.ERR,
+		Type: token.ERR,
 		Word: message,
 	}
 }
 
-func (l *Lexer) readIdent() tokens.Token {
-	var tokType tokens.TokenType
+func (l *Lexer) readIdent() token.Token {
+	var tokType token.TokenType
 
 	start := l.offset - 1
 
@@ -131,24 +139,24 @@ func (l *Lexer) readIdent() tokens.Token {
 	}
 
 	word := l.input[start : l.offset-1]
-	tokType = tokens.LookUpKeyword(word) // lookup for keywords: fn, let, return...
+	tokType = token.LookUpKeyword(word) // lookup for keywords: fn, let, return...
 
 	return l.makeToken(tokType, word)
 }
 
-func (l *Lexer) readNum() tokens.Token {
-	var tokType tokens.TokenType
+func (l *Lexer) readNum() token.Token {
+	var tokType token.TokenType
 
 	start := l.offset - 1
 
-	tokType = tokens.INT
+	tokType = token.INT
 	for isDigit(l.char) { // [0-9]+
 		l.readChar()
 	}
 
 	if l.char == '.' { // floating point literal
 		l.readChar()
-		tokType = tokens.FLOAT
+		tokType = token.FLOAT
 		for isDigit(l.char) {
 			l.readChar()
 		}
@@ -185,10 +193,10 @@ func (l *Lexer) skipWhiteSpace() {
 		case '\t': // assume tab characters take 4 spaces
 			l.col += 4
 		case '\n':
-			l.col = 0
+			l.col = 1
 			l.line++
 		case '\r':
-			l.col = 0
+			l.col = 1
 		default:
 			return
 		}
