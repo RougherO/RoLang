@@ -4,9 +4,9 @@ import (
 	"RoLang/ast"
 	"RoLang/lexer"
 	"RoLang/token"
-	"strconv"
 
 	"fmt"
+	"strconv"
 )
 
 type Parser struct {
@@ -105,6 +105,10 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseLetStatement()
 	case token.RETURN:
 		return p.parseReturnStatement()
+	case token.IF:
+		return p.parseIfStatement()
+	case token.LBRACE:
+		return p.parseBlockStatement()
 	default:
 		return p.parseExpressionStatement()
 	}
@@ -114,7 +118,7 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 	stmt := &ast.LetStatement{Token: p.currToken}
 
 	// match and consume an identifier
-	if !p.matchToken(token.IDENT) {
+	if !p.expectToken(token.IDENT) {
 		return nil
 	}
 
@@ -124,12 +128,46 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 	}
 
 	// match and consume an equals
-	if !p.matchToken(token.ASSIGN) {
+	if !p.expectToken(token.ASSIGN) {
 		return nil
 	}
 
 	for p.currToken.Type != token.SEMCOL {
 		p.readToken()
+	}
+
+	return stmt
+}
+
+func (p *Parser) parseIfStatement() ast.Statement {
+	stmt := &ast.IfStatement{Token: p.currToken}
+	// consume 'if'
+	p.readToken()
+
+	// no parenthesis is necessary we straight
+	// away parse condition expression
+	stmt.Condition = p.parseExpression(NONE)
+
+	if !p.expectToken(token.LBRACE) {
+		return nil
+	}
+
+	stmt.Then = p.parseBlockStatement()
+
+	// check for 'else'
+	if p.peekToken(token.ELSE) {
+		// consume 'else'
+		p.readToken()
+
+		// check if next token is 'if'
+		if p.matchToken(token.IF) {
+			stmt.Else = p.parseIfStatement()
+		} else if p.matchToken(token.LBRACE) {
+			stmt.Else = p.parseBlockStatement()
+		} else {
+			p.report(fmt.Sprintf("expected 'if' or '{'. found %q", p.nextToken.Word))
+			return nil
+		}
 	}
 
 	return stmt
@@ -146,6 +184,25 @@ func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 	}
 
 	return stmt
+}
+
+func (p *Parser) parseBlockStatement() *ast.BlockStatement {
+	block := &ast.BlockStatement{Token: p.currToken}
+	block.Statements = []ast.Statement{}
+
+	// consume '{' token
+	p.readToken()
+
+	for p.currToken.Type != token.RBRACE && p.currToken.Type != token.EOF {
+		stmt := p.parseStatement()
+		if stmt != nil {
+			block.Statements = append(block.Statements, stmt)
+		}
+
+		p.readToken() // read next statement's token
+	}
+
+	return block
 }
 
 func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
@@ -217,7 +274,7 @@ func (p *Parser) parseGroupedExpression() ast.Expression {
 
 	expr := p.parseExpression(NONE)
 
-	if !p.matchToken(token.RPAREN) {
+	if !p.expectToken(token.RPAREN) {
 		return nil
 	}
 
@@ -270,15 +327,22 @@ func (p *Parser) parseBoolLiteral() ast.Expression {
 	}
 }
 
-func (p *Parser) matchToken(tokType token.TokenType) bool {
-	if p.peekToken(tokType) {
+func (p *Parser) matchToken(tokenType token.TokenType) bool {
+	if p.peekToken(tokenType) {
 		p.readToken()
 		return true
 	}
 
-	// Add the error to the list of errors
-	p.peekError(tokType)
 	return false
+}
+
+func (p *Parser) expectToken(tokenType token.TokenType) bool {
+	if !p.matchToken(tokenType) {
+		p.peekError(tokenType)
+		return false
+	}
+
+	return true
 }
 
 func (p *Parser) peekToken(tokType token.TokenType) bool {
@@ -290,16 +354,17 @@ func (p *Parser) readToken() {
 	p.nextToken = p.lexer.NextToken()
 }
 
-func (p *Parser) peekError(tokType token.TokenType) {
-	expectToken := token.TokenString[tokType]
-	message := fmt.Sprintf("%s Expected next token to be %q, got %q instead",
-		p.nextToken.Loc, expectToken, p.nextToken.Word)
-
-	p.errors = append(p.errors, message)
+func (p *Parser) peekError(tokenType token.TokenType) {
+	p.report(fmt.Sprintf("expected next token to be %q, got %q instead",
+		token.TokenString[tokenType], p.nextToken.Word))
 }
 
-func (p *Parser) noPrefixFuncError(tokType token.TokenType) {
-	message := fmt.Sprintf("no prefix parse function for %q found",
-		token.TokenString[tokType])
+func (p *Parser) noPrefixFuncError(tokenType token.TokenType) {
+	p.report(fmt.Sprintf("no prefix parse function for %q found",
+		token.TokenString[tokenType]))
+}
+
+func (p *Parser) report(message string) {
+	message = fmt.Sprintf("%s %s", p.currToken.Loc, message)
 	p.errors = append(p.errors, message)
 }

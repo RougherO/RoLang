@@ -69,6 +69,269 @@ return x;
 	}
 }
 
+func TestIfStatement(t *testing.T) {
+	input := `if x < y { x }`
+
+	l := lexer.New("parser_test_if", input)
+	p := New(l)
+
+	program := p.Parse()
+	checkErrors(t, p)
+
+	if n := len(program.Statements); n != 1 {
+		t.Fatalf("program.Body does not contain %d statements. got=%d\n",
+			1, n)
+	}
+
+	stmt, ok := program.Statements[0].(*ast.IfStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] is not *ast.IfStatement. got=%T",
+			program.Statements[0])
+	}
+
+	if !testInfixExpression(t, stmt.Condition, "x", "<", "y") {
+		return
+	}
+
+	if n := len(stmt.Then.Statements); n != 1 {
+		t.Errorf("then is not 1 statement. got=%d\n",
+			len(stmt.Then.Statements))
+	}
+
+	then, ok := stmt.Then.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("stmt.Then.Statements[0] is not ast.ExpressionStatement. got=%T",
+			stmt.Then.Statements[0])
+	}
+
+	if !testIdentifier(t, then.Expression, "x") {
+		return
+	}
+
+	if stmt.Else != nil {
+		t.Errorf("stmt.Else.Statements was not nil. got=%+v", stmt.Else)
+	}
+}
+
+func TestIfElseStatement(t *testing.T) {
+	input := `if x < y { x } else { y }`
+
+	l := lexer.New("parser_test_if_else", input)
+	p := New(l)
+
+	program := p.Parse()
+	checkErrors(t, p)
+
+	if n := len(program.Statements); n != 1 {
+		t.Fatalf("program.Body does not contain %d statements. got=%d\n", 1, n)
+	}
+
+	stmt, ok := program.Statements[0].(*ast.IfStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] is not *ast.IfStatement. got=%T", stmt)
+	}
+
+	if !testInfixExpression(t, stmt.Condition, "x", "<", "y") {
+		return
+	}
+
+	if n := len(stmt.Then.Statements); n != 1 {
+		t.Fatalf("then is not 1 statement. got=%d", n)
+	}
+
+	then, ok := stmt.Then.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("stmt.Then.Statements[0] is not *ast.ExpressionStatement. got=%T",
+			stmt.Then.Statements[0])
+	}
+
+	if !testIdentifier(t, then.Expression, "x") {
+		return
+	}
+
+	if stmt.Else == nil {
+		t.Fatal("stmt.Else.Statements was nil.")
+	}
+
+	switch block := stmt.Else.(type) {
+	case *ast.BlockStatement:
+		if n := len(block.Statements); n != 1 {
+			t.Fatalf("block is not 1 statement. got=%d", n)
+		}
+
+		expr, ok := block.Statements[0].(*ast.ExpressionStatement)
+		if !ok {
+			t.Fatalf("block.Statements[0] is not *ast.ExpressionStatement. got=%T", expr)
+		}
+
+		if !testIdentifier(t, expr.Expression, "y") {
+			return
+		}
+	default:
+		t.Fatalf("stmt.Else is not *ast.BlockStatement. got=%T", block)
+	}
+}
+
+func TestIfElseIfStatement(t *testing.T) {
+	input := `if x < y { x } else if x > y { y }`
+
+	l := lexer.New("parser_test_if_else_if", input)
+	p := New(l)
+
+	program := p.Parse()
+	checkErrors(t, p)
+
+	if n := len(program.Statements); n != 1 {
+		t.Fatalf("program.Body does not contain %d statements. got=%d\n", 1, n)
+	}
+
+	stmt, ok := program.Statements[0].(*ast.IfStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] is not *ast.IfStatement. got=%T", stmt)
+	}
+
+	if !testInfixExpression(t, stmt.Condition, "x", "<", "y") {
+		return
+	}
+
+	if n := len(stmt.Then.Statements); n != 1 {
+		t.Fatalf("then is not 1 statement. got=%d", n)
+	}
+
+	then, ok := stmt.Then.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("stmt.Then.Statements[0] is not *ast.ExpressionStatement. got=%T",
+			stmt.Then.Statements[0])
+	}
+
+	if !testIdentifier(t, then.Expression, "x") {
+		return
+	}
+
+	if stmt.Else == nil {
+		t.Fatal("stmt.Else.Statements was nil.")
+	}
+
+	switch elseif := stmt.Else.(type) {
+	case *ast.IfStatement:
+		if n := len(elseif.Then.Statements); n != 1 {
+			t.Fatalf("elseif is not 1 statement. got=%d", n)
+		}
+
+		if !testInfixExpression(t, elseif.Condition, "x", ">", "y") {
+			return
+		}
+
+		if n := len(elseif.Then.Statements); n != 1 {
+			t.Fatalf("elseif.then is not 1 statement. got=%d", n)
+		}
+
+		then, ok := elseif.Then.Statements[0].(*ast.ExpressionStatement)
+		if !ok {
+			t.Fatalf("elseif.Then.Statements[0] is not *ast.ExpressionStatement. got=%T",
+				elseif.Then.Statements[0])
+		}
+
+		if !testIdentifier(t, then.Expression, "y") {
+			return
+		}
+
+	default:
+		t.Fatalf("stmt.Else is not *ast.IfStatement. got=%T", elseif)
+	}
+}
+
+func TestIfElseIfElseStatement(t *testing.T) {
+	input := `if x < y { x } else if x > y { y } else { x + y }`
+
+	l := lexer.New("parser_test_if_else_if", input)
+	p := New(l)
+
+	program := p.Parse()
+	checkErrors(t, p)
+
+	if n := len(program.Statements); n != 1 {
+		t.Fatalf("program.Body does not contain %d statements. got=%d\n", 1, n)
+	}
+
+	stmt, ok := program.Statements[0].(*ast.IfStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] is not *ast.IfStatement. got=%T", stmt)
+	}
+
+	if !testInfixExpression(t, stmt.Condition, "x", "<", "y") {
+		return
+	}
+
+	if n := len(stmt.Then.Statements); n != 1 {
+		t.Fatalf("then is not 1 statement. got=%d", n)
+	}
+
+	then, ok := stmt.Then.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("stmt.Then.Statements[0] is not *ast.ExpressionStatement. got=%T",
+			stmt.Then.Statements[0])
+	}
+
+	if !testIdentifier(t, then.Expression, "x") {
+		return
+	}
+
+	if stmt.Else == nil {
+		t.Fatal("stmt.Else.Statements was nil.")
+	}
+
+	switch elseif := stmt.Else.(type) {
+	case *ast.IfStatement:
+		if n := len(elseif.Then.Statements); n != 1 {
+			t.Fatalf("elseif is not 1 statement. got=%d", n)
+		}
+
+		if !testInfixExpression(t, elseif.Condition, "x", ">", "y") {
+			return
+		}
+
+		if n := len(elseif.Then.Statements); n != 1 {
+			t.Fatalf("elseif.then is not 1 statement. got=%d", n)
+		}
+
+		then, ok := elseif.Then.Statements[0].(*ast.ExpressionStatement)
+		if !ok {
+			t.Fatalf("elseif.Then.Statements[0] is not *ast.ExpressionStatement. got=%T",
+				elseif.Then.Statements[0])
+		}
+
+		if !testIdentifier(t, then.Expression, "y") {
+			return
+		}
+
+		if elseif.Else == nil {
+			t.Fatal("elseif.Else.Statements was nil.")
+		}
+
+		switch block := elseif.Else.(type) {
+		case *ast.BlockStatement:
+			if n := len(block.Statements); n != 1 {
+				t.Fatalf("block is not 1 statement. got=%d", n)
+			}
+
+			expr, ok := block.Statements[0].(*ast.ExpressionStatement)
+			if !ok {
+				t.Fatalf("block.Statements[0] is not *ast.ExpressionStatement. got=%T", expr)
+			}
+
+			if !testInfixExpression(t, expr.Expression, "x", "+", "y") {
+				return
+			}
+		default:
+			t.Fatalf("elseif.Else is not *ast.BlockStatement. got=%T", block)
+		}
+
+	default:
+		t.Fatalf("stmt.Else is not *ast.IfStatement. got=%T", elseif)
+	}
+}
+
 func TestPrefixExpression(t *testing.T) {
 	prefixIntTests := []struct {
 		input    string

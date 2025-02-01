@@ -28,6 +28,11 @@ type (
 		Statements []Statement
 	}
 
+	BlockStatement struct {
+		Token      token.Token
+		Statements []Statement
+	}
+
 	LetStatement struct {
 		Token     token.Token
 		Ident     *Identifier
@@ -42,6 +47,13 @@ type (
 	ExpressionStatement struct {
 		Token      token.Token
 		Expression Expression
+	}
+
+	IfStatement struct {
+		Token     token.Token
+		Condition Expression
+		Then      *BlockStatement
+		Else      Statement // block or expression statement
 	}
 
 	PrefixExpression struct {
@@ -96,6 +108,22 @@ func (p *Program) String() string {
 	return out
 }
 
+func (bs *BlockStatement) TokenWord() string {
+	return bs.Token.Word
+}
+
+func (bs *BlockStatement) String() string {
+	var out string
+	out += "{ "
+	for _, stmt := range bs.Statements {
+		out += stmt.String()
+	}
+	out += " }"
+	return out
+}
+
+func (bs *BlockStatement) Statement() {}
+
 func (ls *LetStatement) TokenWord() string {
 	return ls.Token.Word
 }
@@ -137,6 +165,23 @@ func (es *ExpressionStatement) String() string {
 }
 
 func (es *ExpressionStatement) Statement() {}
+
+func (is *IfStatement) TokenWord() string {
+	return is.Token.Word
+}
+
+func (is *IfStatement) String() string {
+	var out string
+	out += fmt.Sprintf("if %s", is.Then)
+
+	if is.Else != nil {
+		out += fmt.Sprintf("else %s", is.Else)
+	}
+
+	return out
+}
+
+func (is *IfStatement) Statement() {}
 
 func (ie *InfixExpression) TokenWord() string {
 	return ie.Token.Word
