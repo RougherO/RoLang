@@ -338,6 +338,7 @@ func TestPrefixExpression(t *testing.T) {
 		operator string
 		right    interface{}
 	}{
+		{"!a", "!", "a"},
 		{"!5;", "!", int64(5)},
 		{"-15;", "-", int64(15)},
 		{"!5.223;", "!", float64(5.223)},
@@ -450,6 +451,89 @@ func TestIdentifierExpression(t *testing.T) {
 
 	if !testIdentifier(t, stmt.Expression, expectStr) {
 		return
+	}
+}
+
+func TestFunctionLiteralExpression(t *testing.T) {
+	input := `fn(x, y) { x + y; }`
+
+	l := lexer.New("parser_test_func_literal", input)
+	p := New(l)
+
+	program := p.Parse()
+	checkErrors(t, p)
+
+	if n := len(program.Statements); n != 1 {
+		t.Fatalf("program.Body does not contain %d statements. got=%d\n", 1, n)
+	}
+
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] is not *ast.ExpressionStatement. got=%T",
+			program.Statements[0])
+	}
+
+	function, ok := stmt.Expression.(*ast.FunctionLiteral)
+	if !ok {
+		t.Fatalf("stmt.Expression is not *ast.FunctionLiteral. got=%T", stmt.Expression)
+	}
+
+	if n := len(function.Parameters); n != 2 {
+		t.Fatalf("incorrect number of function parameters. expect=2, got=%d\n", n)
+	}
+
+	testPrimaryExpression(t, function.Parameters[0], "x")
+	testPrimaryExpression(t, function.Parameters[1], "y")
+
+	if n := len(function.Body.Statements); n != 1 {
+		t.Fatalf("function.Body.Statements has more than 1 statement. got=%d\n", n)
+	}
+
+	body, ok := function.Body.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("function body stmt is not *ast.ExpressionStatement. got=%T",
+			function.Body.Statements[0])
+	}
+
+	testInfixExpression(t, body.Expression, "x", "+", "y")
+}
+
+func TestFunctionParameterParsing(t *testing.T) {
+	tests := []struct {
+		input          string
+		expectedParams []string
+	}{
+		{input: "fn() {};", expectedParams: []string{}},
+		{input: "fn(x) {};", expectedParams: []string{"x"}},
+		{input: "fn(x, y, z) {};", expectedParams: []string{"x", "y", "z"}},
+	}
+	for _, test := range tests {
+
+		l := lexer.New("parser_test_func_params", test.input)
+		p := New(l)
+
+		program := p.Parse()
+		checkErrors(t, p)
+
+		stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+		if !ok {
+			t.Fatalf("program.Statements[0] is not *ast.ExpressionStatement. got=%T",
+				program.Statements[0])
+		}
+
+		function, ok := stmt.Expression.(*ast.FunctionLiteral)
+		if !ok {
+			t.Fatalf("function is not *ast.FunctionLiteral. got=%T", function)
+		}
+
+		if len(function.Parameters) != len(test.expectedParams) {
+			t.Errorf("parameter arity wrong. expect %d, got=%d\n",
+				len(test.expectedParams), len(function.Parameters))
+		}
+
+		for i, ident := range test.expectedParams {
+			testPrimaryExpression(t, function.Parameters[i], ident)
+		}
 	}
 }
 

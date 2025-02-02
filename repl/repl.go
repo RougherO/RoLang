@@ -2,11 +2,12 @@ package repl
 
 import (
 	"RoLang/lexer"
-	"RoLang/token"
+	"RoLang/parser"
 
 	"bufio"
 	"fmt"
 	"io"
+	"strings"
 )
 
 const prompt = "|> "
@@ -23,10 +24,18 @@ func Start(in io.Reader, out io.Writer) {
 		}
 
 		line := scanner.Text()
-		lexer := lexer.New("repl", line)
 
-		for tok := lexer.NextToken(); tok.Type != token.EOF; tok = lexer.NextToken() {
-			fmt.Printf("%+v\n", tok)
+		lexer := lexer.New("repl", line)
+		parser := parser.New(lexer)
+
+		program := parser.Parse()
+		if program == nil {
+			fmt.Println(strings.Join(parser.Errors(), "\n"))
+			continue
+		}
+
+		for _, stmt := range program.Statements {
+			fmt.Printf("%s\n", stmt)
 		}
 	}
 }
