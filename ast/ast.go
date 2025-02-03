@@ -2,7 +2,6 @@ package ast
 
 import (
 	"RoLang/token"
-	"strings"
 
 	"fmt"
 )
@@ -32,6 +31,12 @@ type (
 	BlockStatement struct {
 		Token      token.Token
 		Statements []Statement
+	}
+
+	FunctionStatement struct {
+		Token token.Token
+		Ident *Identifier
+		Value *FunctionLiteral
 	}
 
 	LetStatement struct {
@@ -139,6 +144,25 @@ func (ls *LetStatement) TokenWord() string {
 	return ls.Token.Word
 }
 
+func (fs *FunctionStatement) TokenWord() string {
+	return fs.Token.Word
+}
+
+func (fs *FunctionStatement) String() string {
+	var params string
+	for i, param := range fs.Value.Parameters {
+		if i == 0 {
+			params += param.String()
+		} else {
+			params += ", " + param.String()
+		}
+	}
+
+	return fmt.Sprintf("fn %s(%s) %s", fs.Ident, params, fs.Value.Body)
+}
+
+func (fs *FunctionStatement) Statement() {}
+
 func (ls *LetStatement) String() string {
 	if ls.InitValue != nil {
 		return fmt.Sprintf("let %s = %s;", ls.Ident.Value, ls.InitValue)
@@ -229,12 +253,15 @@ func (fl *FunctionLiteral) TokenWord() string {
 }
 
 func (fl *FunctionLiteral) String() string {
-	params := []string{}
-	for _, p := range fl.Parameters {
-		params = append(params, p.String())
+	var params string
+	for i, param := range fl.Parameters {
+		if i == 0 {
+			params += param.String()
+		} else {
+			params += ", " + param.String()
+		}
 	}
-
-	return fmt.Sprintf("fn (%s) %s", strings.Join(params, ", "), fl.Body)
+	return fmt.Sprintf("fn (%s) %s", params, fl.Body)
 }
 
 func (fl *FunctionLiteral) Expression() {}

@@ -4,9 +4,9 @@ import (
 	"RoLang/ast"
 	"RoLang/lexer"
 	"RoLang/token"
-	"reflect"
 
 	"fmt"
+	"reflect"
 	"strconv"
 )
 
@@ -53,7 +53,7 @@ func New(lexer *lexer.Lexer) *Parser {
 
 	p.table = [token.TOTAL]Entry{
 		// prefix expression do not need a precedence
-		token.LPAREN: {p.parseGroupedExpression, nil, NONE},
+		token.LPAREN: {p.parseGroupedExpression, p.parseCallExpression, POSTFIX},
 		token.IDENT:  {p.parseIdentifier, nil, NONE},
 		token.FN:     {p.parseFunctionLiteral, nil, NONE},
 		token.INT:    {p.parseIntegerLiteral, nil, NONE},
@@ -113,11 +113,55 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseIfStatement()
 	case token.LBRACE:
 		return p.parseBlockStatement()
-	// case token.SEMCOL:
-	// return
+	case token.FN:
+		if p.peekToken(token.LPAREN) {
+			return p.parseExpressionStatement() // function literal
+		}
+		return p.parseFunctionStatement()
 	default:
 		return p.parseExpressionStatement()
 	}
+}
+
+func (p *Parser) parseFunctionStatement() *ast.FunctionStatement {
+	stmt := &ast.FunctionStatement{Token: p.currToken}
+
+	if !p.expectToken(token.IDENT) {
+		return nil
+	}
+
+	stmt.Ident = &ast.Identifier{
+		Token: p.currToken,
+		Value: p.currToken.Word,
+	}
+
+	// assertive check for '('
+	if !p.expectToken(token.LPAREN) {
+		return nil
+	}
+
+	parameters := p.parseFunctionParameters()
+	if parameters == nil {
+		return nil
+	}
+
+	// assertive check for '{'
+	if !p.expectToken(token.LBRACE) {
+		return nil
+	}
+
+	body := p.parseBlockStatement()
+	if body == nil {
+		return nil
+	}
+
+	stmt.Value = &ast.FunctionLiteral{
+		Token:      stmt.Token,
+		Parameters: parameters,
+		Body:       body,
+	}
+
+	return stmt
 }
 
 func (p *Parser) parseLetStatement() *ast.LetStatement {
@@ -262,9 +306,8 @@ func (p *Parser) parseExpression(precedence Precedence) ast.Expression {
 		return nil
 	}
 
-	// keep consuming tokens until we run into a semi colon or the
-	// next token's precedence is greater than current token's precedence
-	// !p.peekToken(token.SEMCOL) &&
+	// keep consuming tokens until next token's precedence
+	// is greater than current token's precedence
 	for precedence < p.table[p.nextToken.Type].precedence {
 		infix := p.table[p.nextToken.Type].infix
 		if infix == nil { // only prefix expression
@@ -324,6 +367,43 @@ func (p *Parser) parseGroupedExpression() ast.Expression {
 	}
 
 	return expr
+}
+
+func (p *Parser) parseCallExpression(callee ast.Expression) ast.Expression {
+	expr := &ast.CallExpression{Token: p.currToken, Callee: callee}
+	args := p.parseCallArguments()
+	if args == nil {
+		return nil
+	}
+	expr.Arguments = args
+
+	return expr
+}
+
+func (p *Parser) parseCallArguments() []ast.Expression {
+	args := []ast.Expression{}
+	for {
+		if p.peekToken(token.RPAREN) {
+			break
+		}
+
+		arg := p.parseExpression(NONE)
+		if arg == nil {
+			return nil
+		}
+
+		args = append(args, arg)
+		if !p.peekToken(token.COMMA) {
+			break
+		}
+		p.readToken()
+	}
+
+	if !p.expectToken(token.RPAREN) {
+		return nil
+	}
+
+	return args
 }
 
 func (p *Parser) parseIdentifier() ast.Expression {

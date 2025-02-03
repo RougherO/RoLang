@@ -42,6 +42,52 @@ let foobar = 01923;
 	}
 }
 
+func TestFunctionStatement(t *testing.T) {
+	input := "fn add(x, y) { x + y; }"
+
+	l := lexer.New("parser_test_func_stmt", input)
+	p := New(l)
+
+	program := p.Parse()
+	checkErrors(t, p)
+
+	if n := len(program.Statements); n != 1 {
+		t.Fatalf("program.Statements does not contain 1 statement. got=%d", n)
+	}
+
+	fn, ok := program.Statements[0].(*ast.FunctionStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] not *ast.FunctionStatement. got=%T", program.Statements[0])
+	}
+
+	if !testIdentifier(t, fn.Ident, "add") {
+		return
+	}
+
+	if len(fn.Value.Parameters) != 2 {
+		t.Fatalf("fn.Value.Parameters has incorrect arity. got=%d", len(fn.Value.Parameters))
+	}
+
+	if !testIdentifier(t, fn.Value.Parameters[0], "x") ||
+		!testIdentifier(t, fn.Value.Parameters[1], "y") {
+		return
+	}
+
+	if n := len(fn.Value.Body.Statements); n != 1 {
+		t.Fatalf("fn.Value.Body.Statements contain incorrect number of statements. got=%d", n)
+	}
+
+	stmt, ok := fn.Value.Body.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("fn.Value.Body.Statements[0] not *ast.ExpressionStatement. got=%T",
+			fn.Value.Body.Statements[0])
+	}
+
+	if !testInfixExpression(t, stmt.Expression, "x", "+", "y") {
+		return
+	}
+}
+
 func TestReturnStatement(t *testing.T) {
 	input := `
 return 5;
