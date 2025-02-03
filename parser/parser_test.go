@@ -385,10 +385,10 @@ func TestPrefixExpression(t *testing.T) {
 		right    interface{}
 	}{
 		{"!a", "!", "a"},
-		{"!5;", "!", int64(5)},
-		{"-15;", "-", int64(15)},
-		{"!5.223;", "!", float64(5.223)},
-		{"-10.23;", "-", float64(10.23)},
+		{"!5;", "!", 5},
+		{"-15;", "-", 15},
+		{"!5.223;", "!", 5.223},
+		{"-10.23;", "-", 10.23},
 	}
 
 	for _, test := range prefixIntTests {
@@ -420,22 +420,22 @@ func TestInfixExpression(t *testing.T) {
 		operator string
 		right    interface{}
 	}{
-		{"5 + 5;", int64(5), "+", int64(5)},
-		{"5 - 5;", int64(5), "-", int64(5)},
-		{"5 * 5;", int64(5), "*", int64(5)},
-		{"5 / 5;", int64(5), "/", int64(5)},
-		{"5 > 5;", int64(5), ">", int64(5)},
-		{"5 < 5;", int64(5), "<", int64(5)},
-		{"5 == 5;", int64(5), "==", int64(5)},
-		{"5 != 5;", int64(5), "!=", int64(5)},
-		{"5.23 + 5.23;", float64(5.23), "+", float64(5.23)},
-		{"5.23 - 5.23;", float64(5.23), "-", float64(5.23)},
-		{"5.23 * 5.23;", float64(5.23), "*", float64(5.23)},
-		{"5.23 / 5.23;", float64(5.23), "/", float64(5.23)},
-		{"5.23 > 5.23;", float64(5.23), ">", float64(5.23)},
-		{"5.23 < 5.23;", float64(5.23), "<", float64(5.23)},
-		{"5.23 == 5.23;", float64(5.23), "==", float64(5.23)},
-		{"5.23 != 5.23;", float64(5.23), "!=", float64(5.23)},
+		{"5 + 5;", 5, "+", 5},
+		{"5 - 5;", 5, "-", 5},
+		{"5 * 5;", 5, "*", 5},
+		{"5 / 5;", 5, "/", 5},
+		{"5 > 5;", 5, ">", 5},
+		{"5 < 5;", 5, "<", 5},
+		{"5 == 5;", 5, "==", 5},
+		{"5 != 5;", 5, "!=", 5},
+		{"5.23 + 5.23;", 5.23, "+", 5.23},
+		{"5.23 - 5.23;", 5.23, "-", 5.23},
+		{"5.23 * 5.23;", 5.23, "*", 5.23},
+		{"5.23 / 5.23;", 5.23, "/", 5.23},
+		{"5.23 > 5.23;", 5.23, ">", 5.23},
+		{"5.23 < 5.23;", 5.23, "<", 5.23},
+		{"5.23 == 5.23;", 5.23, "==", 5.23},
+		{"5.23 != 5.23;", 5.23, "!=", 5.23},
 		{"a + a;", "a", "+", "a"},
 		{"a - a;", "a", "-", "a"},
 		{"a * a;", "a", "*", "a"},
@@ -473,6 +473,46 @@ func TestInfixExpression(t *testing.T) {
 		}
 
 		testInfixExpression(t, stmt.Expression, test.left, test.operator, test.right)
+	}
+}
+
+func TestCallExpression(t *testing.T) {
+	input := "add(1, 2 * 3, 4.53 + 5.22);"
+
+	l := lexer.New("parser_test_call_expr", input)
+	p := New(l)
+
+	program := p.Parse()
+	checkErrors(t, p)
+
+	if n := len(program.Statements); n != 1 {
+		t.Fatalf("program.Statements does not contain %d statements. got=%d\n", 1, n)
+	}
+
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("stmt is not ast.ExpressionStatement. got=%T",
+			program.Statements[0])
+	}
+
+	expr, ok := stmt.Expression.(*ast.CallExpression)
+	if !ok {
+		t.Fatalf("stmt.Expression is not ast.CallExpression. got=%T",
+			stmt.Expression)
+	}
+
+	if !testIdentifier(t, expr.Callee, "add") {
+		return
+	}
+
+	if len(expr.Arguments) != 3 {
+		t.Fatalf("expr.Arguments has wrong arity. got=%d", len(expr.Arguments))
+	}
+
+	if !testIntLiteral(t, expr.Arguments[0], 1) ||
+		!testInfixExpression(t, expr.Arguments[1], 2, "*", 3) ||
+		!testInfixExpression(t, expr.Arguments[2], 4.53, "+", 5.22) {
+		return
 	}
 }
 
@@ -585,7 +625,7 @@ func TestFunctionParameterParsing(t *testing.T) {
 
 func TestIntegerLiteralExpression(t *testing.T) {
 	input := "5;"
-	expectNum := int64(5)
+	expectNum := 5
 
 	l := lexer.New("parser_test_int", input)
 	p := New(l)
@@ -603,7 +643,7 @@ func TestIntegerLiteralExpression(t *testing.T) {
 			program.Statements[0])
 	}
 
-	if !testIntLiteral(t, stmt.Expression, expectNum) {
+	if !testPrimaryExpression(t, stmt.Expression, expectNum) {
 		return
 	}
 }
@@ -859,6 +899,8 @@ func testPrimaryExpression(t *testing.T, expr ast.Expression, expect interface{}
 	switch v := expect.(type) {
 	case int64:
 		return testIntLiteral(t, expr, v)
+	case int:
+		return testIntLiteral(t, expr, int64(v))
 	case float64:
 		return testFloatLiteral(t, expr, v)
 	case string:

@@ -371,6 +371,7 @@ func (p *Parser) parseGroupedExpression() ast.Expression {
 
 func (p *Parser) parseCallExpression(callee ast.Expression) ast.Expression {
 	expr := &ast.CallExpression{Token: p.currToken, Callee: callee}
+
 	args := p.parseCallArguments()
 	if args == nil {
 		return nil
@@ -381,11 +382,14 @@ func (p *Parser) parseCallExpression(callee ast.Expression) ast.Expression {
 }
 
 func (p *Parser) parseCallArguments() []ast.Expression {
+	// p.readToken() // consume '('
+
 	args := []ast.Expression{}
 	for {
 		if p.peekToken(token.RPAREN) {
 			break
 		}
+		p.readToken()
 
 		arg := p.parseExpression(NONE)
 		if arg == nil {

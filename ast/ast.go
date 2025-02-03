@@ -75,6 +75,12 @@ type (
 		Right    Expression
 	}
 
+	CallExpression struct {
+		Token     token.Token // '(' token
+		Callee    Expression
+		Arguments []Expression
+	}
+
 	Identifier struct {
 		Token token.Token
 		Value string
@@ -247,6 +253,25 @@ func (id *Identifier) String() string {
 }
 
 func (id *Identifier) Expression() {}
+
+func (ce *CallExpression) TokenWord() string {
+	return ce.Token.Word
+}
+
+func (ce *CallExpression) String() string {
+	var args string
+	for i, arg := range ce.Arguments {
+		if i == 0 {
+			args += arg.String()
+		} else {
+			args += ", " + arg.String()
+		}
+	}
+
+	return fmt.Sprintf("%s(%s)", ce.Callee, args)
+}
+
+func (ce *CallExpression) Expression() {}
 
 func (fl *FunctionLiteral) TokenWord() string {
 	return fl.Token.Word
