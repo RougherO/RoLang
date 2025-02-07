@@ -134,7 +134,7 @@ func (l *Lexer) readIdent() token.Token {
 
 	start := l.offset - 1
 
-	for isAlpha(l.char) { // [A-Za-z_]+
+	for isAlpha(l.char) || isDigit(l.char) || l.char == '_' { // [A-Za-z_0-9]+
 		l.readChar()
 	}
 
@@ -205,7 +205,7 @@ func (l *Lexer) skipWhiteSpace() {
 }
 
 func isAlpha(char byte) bool {
-	return 'a' <= char && char <= 'z' || 'A' <= char && char <= 'Z' || char == '_'
+	return 'a' <= char && char <= 'z' || 'A' <= char && char <= 'Z'
 }
 
 func isDigit(char byte) bool {
