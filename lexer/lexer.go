@@ -83,8 +83,7 @@ func (l *Lexer) NextToken() token.Token {
 			tok = l.makeToken(token.GT, ">")
 		}
 	case 0:
-		tok.Word = "EOF"
-		tok.Type = token.EOF
+		tok = l.makeToken(token.EOF, "eof")
 	default:
 		if isAlpha(l.char) { // check [A-Za-z_]
 			tok = l.readIdent()
