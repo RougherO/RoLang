@@ -114,9 +114,6 @@ func (p *Parser) parseStatement() ast.Statement {
 	case token.LBRACE:
 		return p.parseBlockStatement()
 	case token.FN:
-		if p.peekToken(token.LPAREN) {
-			return p.parseExpressionStatement() // function literal
-		}
 		return p.parseFunctionStatement()
 	default:
 		return p.parseExpressionStatement()
@@ -181,8 +178,17 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 	if !p.expectToken(token.ASSIGN) {
 		return nil
 	}
+	p.readToken()
 
-	for !p.hasToken(token.SEMCOL) {
+	initValue := p.parseExpression(NONE)
+	if initValue == nil {
+		return nil
+	}
+
+	stmt.InitValue = initValue
+
+	// optional semi-colon token
+	if p.peekToken(token.SEMCOL) {
 		p.readToken()
 	}
 
@@ -245,7 +251,15 @@ func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 	// consume 'return' token
 	p.readToken()
 
-	for !p.hasToken(token.SEMCOL) {
+	returnValue := p.parseExpression(NONE)
+	if returnValue == nil {
+		return nil
+	}
+
+	stmt.ReturnValue = returnValue
+
+	// optional semi-colon token
+	if p.peekToken(token.SEMCOL) {
 		p.readToken()
 	}
 
