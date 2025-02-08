@@ -17,7 +17,7 @@ let y = 10.23;
 let foobar = x;
 let neg = -1;
 let add23 = 2 + 3;
-let calladd = fn (x, y) { x + y }
+let calladd = fn (x, y) { x + y; };
 `
 	l := lexer.New("parser_test_let", input)
 	p := New(l)
@@ -158,7 +158,7 @@ return 1 + 2;
 }
 
 func TestIfStatement(t *testing.T) {
-	input := `if x < y { x }`
+	input := `if x < y { x; }`
 
 	l := lexer.New("parser_test_if", input)
 	p := New(l)
@@ -202,7 +202,7 @@ func TestIfStatement(t *testing.T) {
 }
 
 func TestIfElseStatement(t *testing.T) {
-	input := `if x < y { x } else { y }`
+	input := `if x < y { x; } else { y; }`
 
 	l := lexer.New("parser_test_if_else", input)
 	p := New(l)
@@ -261,7 +261,7 @@ func TestIfElseStatement(t *testing.T) {
 }
 
 func TestIfElseIfStatement(t *testing.T) {
-	input := `if x < y { x } else if x > y { y }`
+	input := `if x < y { x; } else if x > y { y; }`
 
 	l := lexer.New("parser_test_if_else_if", input)
 	p := New(l)
@@ -330,7 +330,7 @@ func TestIfElseIfStatement(t *testing.T) {
 }
 
 func TestIfElseIfElseStatement(t *testing.T) {
-	input := `if x < y { x } else if x > y { y } else { x + y }`
+	input := `if x < y { x; } else if x > y { y; } else { x + y; }`
 
 	l := lexer.New("parser_test_if_else_if", input)
 	p := New(l)
@@ -426,7 +426,7 @@ func TestPrefixExpression(t *testing.T) {
 		operator string
 		right    interface{}
 	}{
-		{"!a", "!", "a"},
+		{"!a;", "!", "a"},
 		{"!5;", "!", 5},
 		{"-15;", "-", 15},
 		{"!5.223;", "!", 5.223},
@@ -670,10 +670,6 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 			"(((a + (b * c)) + (d / e)) - f)",
 		},
 		{
-			"3 + 4; -5 * 5",
-			"(3 + 4)((-5) * 5)",
-		},
-		{
 			"5 > 4 == 3 < 4",
 			"((5 > 4) == (3 < 4))",
 		},
@@ -731,10 +727,10 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 		l := lexer.New("parser_test_operator_precedence", test.input)
 		p := New(l)
 
-		program := p.Parse()
+		expr := p.ParseExpression(NONE)
 		checkErrors(t, p)
 
-		if found := program.String(); found != test.expected {
+		if found := expr.String(); found != test.expected {
 			t.Errorf("expected=%q, got=%q", test.expected, found)
 		}
 	}

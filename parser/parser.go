@@ -45,7 +45,6 @@ const (
 )
 
 func New(lexer *lexer.Lexer) *Parser {
-	// Allocating on heap
 	p := &Parser{
 		lexer:  lexer,
 		errors: []string{},
@@ -81,13 +80,12 @@ func New(lexer *lexer.Lexer) *Parser {
 }
 
 func (p *Parser) Parse() *ast.Program {
-	// Allocating on heap
 	program := &ast.Program{}
 	program.Statements = []ast.Statement{}
 
 	// Read until end of file
 	for !p.hasToken(token.EOF) {
-		stmt := p.parseStatement()
+		stmt := p.ParseStatement()
 		if reflect.ValueOf(stmt).IsNil() {
 			return nil
 		}
@@ -99,11 +97,7 @@ func (p *Parser) Parse() *ast.Program {
 	return program
 }
 
-func (p *Parser) Errors() []string {
-	return p.errors
-}
-
-func (p *Parser) parseStatement() ast.Statement {
+func (p *Parser) ParseStatement() ast.Statement {
 	switch p.currToken.Type {
 	case token.LET:
 		return p.parseLetStatement()
@@ -116,8 +110,39 @@ func (p *Parser) parseStatement() ast.Statement {
 	case token.FN:
 		return p.parseFunctionStatement()
 	default:
-		return p.parseExpressionStatement()
+		return p.ParseExpressionStatement()
 	}
+}
+
+func (p *Parser) ParseExpression(precedence Precedence) ast.Expression {
+	prefix := p.table[p.currToken.Type].prefix
+	if prefix == nil {
+		p.noPrefixFuncError(p.currToken.Type)
+		return nil
+	}
+
+	expr := prefix()
+	if expr == nil {
+		return nil
+	}
+
+	// keep consuming tokens until next token's precedence
+	// is greater than current token's precedence
+	for precedence < p.table[p.nextToken.Type].precedence {
+		infix := p.table[p.nextToken.Type].infix
+		if infix == nil { // only prefix expression
+			return expr
+		}
+
+		p.readToken()
+		expr = infix(expr)
+	}
+
+	return expr
+}
+
+func (p *Parser) Errors() []string {
+	return p.errors
 }
 
 func (p *Parser) parseFunctionStatement() *ast.FunctionStatement {
@@ -180,7 +205,7 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 	}
 	p.readToken()
 
-	initValue := p.parseExpression(NONE)
+	initValue := p.ParseExpression(NONE)
 	if initValue == nil {
 		return nil
 	}
@@ -188,8 +213,8 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 	stmt.InitValue = initValue
 
 	// optional semi-colon token
-	if p.peekToken(token.SEMCOL) {
-		p.readToken()
+	if !p.expectToken(token.SEMCOL) {
+		return nil
 	}
 
 	return stmt
@@ -202,7 +227,7 @@ func (p *Parser) parseIfStatement() ast.Statement {
 
 	// no parenthesis is necessary we straight
 	// away parse condition expression
-	condition := p.parseExpression(NONE)
+	condition := p.ParseExpression(NONE)
 	if condition == nil {
 		return nil
 	}
@@ -251,16 +276,15 @@ func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 	// consume 'return' token
 	p.readToken()
 
-	returnValue := p.parseExpression(NONE)
+	returnValue := p.ParseExpression(NONE)
 	if returnValue == nil {
 		return nil
 	}
 
 	stmt.ReturnValue = returnValue
 
-	// optional semi-colon token
-	if p.peekToken(token.SEMCOL) {
-		p.readToken()
+	if !p.expectToken(token.SEMCOL) {
+		return nil
 	}
 
 	return stmt
@@ -274,7 +298,7 @@ func (p *Parser) parseBlockStatement() *ast.BlockStatement {
 	p.readToken()
 
 	for !p.hasToken(token.RBRACE) && !p.hasToken(token.EOF) {
-		stmt := p.parseStatement()
+		stmt := p.ParseStatement()
 		if stmt == nil {
 			return nil
 		}
@@ -291,48 +315,21 @@ func (p *Parser) parseBlockStatement() *ast.BlockStatement {
 	return block
 }
 
-func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
+func (p *Parser) ParseExpressionStatement() *ast.ExpressionStatement {
 	stmt := &ast.ExpressionStatement{Token: p.currToken}
 
-	expr := p.parseExpression(NONE)
+	expr := p.ParseExpression(NONE)
 	if expr == nil {
 		return nil
 	}
 
 	stmt.Expression = expr
 
-	if p.peekToken(token.SEMCOL) {
-		p.readToken()
+	if !p.expectToken(token.SEMCOL) {
+		return nil
 	}
 
 	return stmt
-}
-
-func (p *Parser) parseExpression(precedence Precedence) ast.Expression {
-	prefix := p.table[p.currToken.Type].prefix
-	if prefix == nil {
-		p.noPrefixFuncError(p.currToken.Type)
-		return nil
-	}
-
-	expr := prefix()
-	if expr == nil {
-		return nil
-	}
-
-	// keep consuming tokens until next token's precedence
-	// is greater than current token's precedence
-	for precedence < p.table[p.nextToken.Type].precedence {
-		infix := p.table[p.nextToken.Type].infix
-		if infix == nil { // only prefix expression
-			return expr
-		}
-
-		p.readToken()
-		expr = infix(expr)
-	}
-
-	return expr
 }
 
 func (p *Parser) parsePrefixExpression() ast.Expression {
@@ -341,7 +338,7 @@ func (p *Parser) parsePrefixExpression() ast.Expression {
 		Operator: p.currToken.Word,
 	}
 	p.readToken()
-	right := p.parseExpression(PREFIX)
+	right := p.ParseExpression(PREFIX)
 	expr.Right = right
 
 	return expr
@@ -359,7 +356,7 @@ func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 	// consume current token
 	p.readToken()
 	// start parsing the next token and use current token's precedence
-	right := p.parseExpression(precedence)
+	right := p.ParseExpression(precedence)
 	if right == nil {
 		return nil
 	}
@@ -371,7 +368,7 @@ func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 func (p *Parser) parseGroupedExpression() ast.Expression {
 	p.readToken()
 
-	expr := p.parseExpression(NONE)
+	expr := p.ParseExpression(NONE)
 	if expr == nil {
 		return nil
 	}
@@ -405,7 +402,7 @@ func (p *Parser) parseCallArguments() []ast.Expression {
 		}
 		p.readToken()
 
-		arg := p.parseExpression(NONE)
+		arg := p.ParseExpression(NONE)
 		if arg == nil {
 			return nil
 		}
