@@ -284,7 +284,7 @@ func isTruthy(value any) bool {
 		fallthrough
 	case nil:
 		fallthrough
-	case 0:
+	case int64(0):
 		fallthrough
 	case 0.0:
 		fallthrough
