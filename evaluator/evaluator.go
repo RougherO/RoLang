@@ -236,6 +236,8 @@ func evalEqOperator(left, right any) bool {
 			return l == float64(r)
 		case float64:
 			return l == r
+		case bool:
+			return false // TODO: replace with runtime errors
 		default:
 			return false // TODO: replace with runtime errors
 		}
