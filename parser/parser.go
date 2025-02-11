@@ -278,6 +278,9 @@ func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 
 	// consume 'return' token
 	p.readToken()
+	if p.hasToken(token.SEMCOL) {
+		return stmt
+	}
 
 	returnValue := p.ParseExpression(NONE)
 	if returnValue == nil {
@@ -285,7 +288,6 @@ func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 	}
 
 	stmt.ReturnValue = returnValue
-
 	if !p.expectToken(token.SEMCOL) {
 		return nil
 	}
