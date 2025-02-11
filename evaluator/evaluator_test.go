@@ -4,9 +4,77 @@ import (
 	"RoLang/lexer"
 	"RoLang/parser"
 
+	"bytes"
 	"math"
+	"regexp"
+	"strings"
 	"testing"
 )
+
+type expectType struct {
+	name  string
+	value any
+}
+
+func TestBlockStatement(t *testing.T) {
+	// TODO need tests
+}
+
+func TestFunctionStatement(t *testing.T) {
+	// TODO need tests
+}
+
+func TestIfStatement(t *testing.T) {
+	// TODO need tests
+}
+
+func TestLetStatement(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect []expectType
+	}{
+		{
+			"let a = 5;",
+			[]expectType{
+				{"a", int64(5)},
+			}},
+		{
+			"let a = 5.2 * 2;",
+			[]expectType{
+				{"a", 10.4},
+			},
+		},
+		{
+			"let a = 5; let b = a;",
+			[]expectType{
+				{"a", int64(5)},
+				{"b", int64(5)},
+			},
+		},
+		{
+			"let a = 5.5; let b = a; let c = a + b + 5;",
+			[]expectType{
+				{"a", 5.5},
+				{"b", 5.5},
+				{"c", 16.0},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		if !testLetStatements(t, test.input, test.expect) {
+			t.Logf("test[%d]\n", i)
+		}
+	}
+}
+
+func TestCallExpressions(t *testing.T) {
+	// TODO needs test
+}
+
+func TestClosureExpression(t *testing.T) {
+	// TODO needs test
+}
 
 func TestInfixOperator(t *testing.T) {
 	tests := []struct {
@@ -142,20 +210,83 @@ func TestBooleanExpression(t *testing.T) {
 	}
 }
 
-func testEvalStatement(input string) any {
-	l := lexer.New("evaluator_test_statement", input)
+func TestErrorStatements(t *testing.T) {
+	out := new(bytes.Buffer)
+	err := new(bytes.Buffer)
+
+	Init(nil, out, err)
+
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		// {"let x = 1", "expected next token to be \";\", got \"eof\" instead"},
+		{"let x = y;", "variable not found: y"},
+		{"let x = 1; let y = x();", "not a callable int"},
+	}
+
+	for i, test := range tests {
+		testEvalStatements(test.input)
+		if !testErrors(t, err, test.expect) {
+			t.Logf("test[%d]\n", i)
+		}
+		out.Reset()
+		err.Reset()
+	}
+}
+
+func testLetStatements(t *testing.T, input string, expects []expectType) bool {
+	out := new(bytes.Buffer)
+	err := new(bytes.Buffer)
+
+	Init(nil, out, err)
+
+	l := lexer.New("evaluator_test", input)
 	p := parser.New(l)
 
-	stmt := p.ParseStatement()
-	return Eval(stmt)
+	program := p.Parse()
+	Evaluate(program)
+
+	isValid := true
+	for _, item := range expects {
+		name := item.name
+		expect := item.value
+
+		isValid = isValid && testIdentifier(t, name, expect)
+	}
+
+	return isValid
+}
+
+func testIdentifier(t *testing.T, name string, expect any) bool {
+	value, ok := ctxt.Env.Get(name)
+	if !ok {
+		t.Errorf("no identifier found %s", name)
+		return false
+	}
+
+	if value != expect {
+		t.Errorf("values are not equal %v(%T) %v(%T)", value, value, expect, expect)
+		return false
+	}
+
+	return true
+}
+
+func testEvalStatements(input string) {
+	l := lexer.New("evaluator_test", input)
+	p := parser.New(l)
+
+	program := p.Parse()
+	evalStatements(program.Statements)
 }
 
 func testEvalExpression(input string) any {
-	l := lexer.New("evaluator_test_expression", input)
+	l := lexer.New("evaluator_test", input)
 	p := parser.New(l)
 
 	expr := p.ParseExpression(parser.NONE)
-	return Eval(expr)
+	return evalExpression(expr)
 }
 
 func testPrimaryObject(t *testing.T, obj any, expect any) bool {
@@ -207,7 +338,7 @@ func testIntegerObject(t *testing.T, obj any, expect int64) bool {
 func testFloatObject(t *testing.T, obj any, expect float64) bool {
 	result, ok := obj.(float64)
 	if !ok {
-		t.Errorf("object is not Float. got=%T (%+v)", obj, obj)
+		t.Errorf("object is not Float. got=%T", obj)
 		return false
 	}
 
@@ -219,5 +350,18 @@ func testFloatObject(t *testing.T, obj any, expect float64) bool {
 		return false
 	}
 
+	return true
+}
+
+var re, _ = regexp.Compile(`evaluator_test:\d+:\d+:`)
+
+func testErrors(t *testing.T, err *bytes.Buffer, expect string) bool {
+	errStr := err.String()
+	errStr = strings.TrimPrefix(errStr, re.FindString(errStr)) // trim the location info
+	errStr = strings.TrimSpace(errStr)                         // trime surrounding spaces
+	if expect != errStr {
+		t.Errorf("different error statement. got=%q expect=%q", errStr, expect)
+		return false
+	}
 	return true
 }
