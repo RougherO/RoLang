@@ -7,6 +7,7 @@ import (
 
 	"fmt"
 	"io"
+	"os"
 )
 
 type (
@@ -27,7 +28,28 @@ func Init(in io.Reader, out, err io.Writer) {
 	ctxt = context.New(in, out, err)
 }
 
+func recoverHandler() {
+	err := recover()
+
+	if err != nil {
+		switch e := err.(type) {
+		case returnObject:
+			switch e := e.value.(type) {
+			case int64:
+				os.Exit(int(e))
+			case nil:
+				os.Exit(0)
+			default:
+				io.WriteString(ctxt.Err, "can only return integer exit codes at top level\n")
+			}
+		default:
+			io.WriteString(ctxt.Err, fmt.Sprintf("recovering: %v", e))
+		}
+	}
+}
+
 func Evaluate(program *ast.Program) {
+	defer recoverHandler()
 	evalStatements(program.Statements)
 }
 
@@ -110,7 +132,10 @@ func evalLetStatement(s *ast.LetStatement) {
 }
 
 func evalReturnStatement(s *ast.ReturnStatement) {
-	retValue := evalExpression(s.ReturnValue)
+	var retValue any
+	if s.ReturnValue != nil {
+		retValue = evalExpression(s.ReturnValue)
+	}
 	panic(returnObject{value: retValue})
 }
 
