@@ -10,5 +10,5 @@ const MESSAGE = `RoLang v0.1 Tree-Walk Interpreter`
 
 func main() {
 	fmt.Println(MESSAGE)
-	repl.Start(os.Stdin, os.Stdout)
+	repl.Start(os.Stdin, os.Stdout, os.Stderr)
 }

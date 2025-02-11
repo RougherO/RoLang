@@ -108,9 +108,12 @@ func (p *Parser) ParseStatement() ast.Statement {
 	case token.LBRACE:
 		return p.parseBlockStatement()
 	case token.FN:
+		if p.peekToken(token.LPAREN) {
+			return p.parseExpressionStatement()
+		}
 		return p.parseFunctionStatement()
 	default:
-		return p.ParseExpressionStatement()
+		return p.parseExpressionStatement()
 	}
 }
 
@@ -315,7 +318,7 @@ func (p *Parser) parseBlockStatement() *ast.BlockStatement {
 	return block
 }
 
-func (p *Parser) ParseExpressionStatement() *ast.ExpressionStatement {
+func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 	stmt := &ast.ExpressionStatement{Token: p.currToken}
 
 	expr := p.ParseExpression(NONE)
