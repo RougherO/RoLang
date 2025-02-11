@@ -94,6 +94,12 @@ func evalFunctionStatement(s *ast.FunctionStatement) {
 
 func evalLetStatement(s *ast.LetStatement) {
 	init := evalExpression(s.InitValue)
+	if init == nil {
+		// some error occured
+		// do not initialise variable
+		return
+	}
+
 	name := s.Ident.Value
 	if !ctxt.Env.Set(name, init) {
 		panic(fmt.Sprintf("variable %s already exists in current scope", name))
