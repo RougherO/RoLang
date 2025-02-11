@@ -31,3 +31,7 @@ func (e *Environment) Set(name string, value any) bool {
 	e.store[name] = value
 	return true
 }
+
+func (e *Environment) Outer() *Environment {
+	return e.outer
+}

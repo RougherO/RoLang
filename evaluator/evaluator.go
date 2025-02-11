@@ -100,7 +100,7 @@ func evalStatement(stmt ast.Statement) {
 	case *ast.IfStatement:
 		evalIfStatement(s)
 	case *ast.BlockStatement:
-		ctxt.CreateEnv(ctxt.Env)
+		ctxt.CreateEnv()
 		evalStatements(s.Statements)
 		// should pop out the current environment no matter what
 		defer ctxt.RestoreEnv()
@@ -204,7 +204,7 @@ func callFunction(fn any, args []any) (retValue any) {
 	switch obj := fn.(type) {
 	case *fnObject:
 		returnRetriever := func() {
-			ctxt.RestoreEnv()
+			ctxt.ResetEnv()
 
 			err := recover()
 			switch val := err.(type) {
@@ -217,7 +217,7 @@ func callFunction(fn any, args []any) (retValue any) {
 		defer returnRetriever() // set return value or propagate error
 
 		// create new scope with the function's
-		ctxt.CreateEnv(obj.env)
+		ctxt.SetEnv(obj.env)
 
 		function := obj.fn
 		if len(args) != len(function.Parameters) {
