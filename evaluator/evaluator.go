@@ -78,7 +78,10 @@ func evalStatement(stmt ast.Statement) {
 	case *ast.IfStatement:
 		evalIfStatement(s)
 	case *ast.BlockStatement:
+		ctxt.CreateEnv(ctxt.Env)
 		evalStatements(s.Statements)
+		// should pop out the current environment no matter what
+		defer ctxt.RestoreEnv()
 	case *ast.ExpressionStatement:
 		evalExpression(s.Expression)
 	}
@@ -148,14 +151,24 @@ func evalExpression(expr ast.Expression) any {
 
 func evalCallExpression(e *ast.CallExpression) any {
 	value := evalExpression(e.Callee)
+	if value == nil {
+		return nil
+	}
+
 	args := evalCallArgs(e.Arguments)
+	if args == nil {
+		return nil
+	}
 	return callFunction(value, args)
 }
 
 func evalCallArgs(args []ast.Expression) []any {
-	var result []any
+	result := make([]any, 0)
 	for _, e := range args {
 		arg := evalExpression(e)
+		if arg == nil {
+			return nil
+		}
 		result = append(result, arg)
 	}
 
@@ -220,7 +233,15 @@ func evalIdentifier(e *ast.Identifier) any {
 
 func evalInfixExpression(e *ast.InfixExpression) any {
 	left := evalExpression(e.Left)
+	if left == nil {
+		return nil
+	}
+
 	right := evalExpression(e.Right)
+	if right == nil {
+		return nil
+	}
+
 	switch e.Operator {
 	case "+":
 		return evalAddOperator(left, right)
@@ -410,6 +431,10 @@ func evalEqOperator(left, right any) bool {
 
 func evalPrefixExpression(e *ast.PrefixExpression) any {
 	right := evalExpression(e.Right)
+	if right == nil {
+		return nil
+	}
+
 	switch e.Operator {
 	case "!":
 		return evalBangOperator(right)
