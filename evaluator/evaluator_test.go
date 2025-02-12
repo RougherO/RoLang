@@ -3,10 +3,10 @@ package evaluator
 import (
 	"RoLang/lexer"
 	"RoLang/parser"
+	"regexp"
 
 	"bytes"
 	"math"
-	"regexp"
 	"strings"
 	"testing"
 )
@@ -211,10 +211,9 @@ func TestBooleanExpression(t *testing.T) {
 }
 
 func TestErrorStatements(t *testing.T) {
-	out := new(bytes.Buffer)
 	err := new(bytes.Buffer)
 
-	Init(nil, out, err)
+	Init(nil, nil, err)
 
 	tests := []struct {
 		input  string
@@ -230,9 +229,15 @@ func TestErrorStatements(t *testing.T) {
 		if !testErrors(t, err, test.expect) {
 			t.Logf("test[%d]\n", i)
 		}
-		out.Reset()
 		err.Reset()
 	}
+}
+
+func TestOutStatements(t *testing.T) {
+	out := new(bytes.Buffer)
+
+	Init(nil, out, nil)
+
 }
 
 func testLetStatements(t *testing.T, input string, expects []expectType) bool {
@@ -278,7 +283,7 @@ func testEvalStatements(input string) {
 	p := parser.New(l)
 
 	program := p.Parse()
-	evalStatements(program.Statements)
+	Evaluate(program)
 }
 
 func testEvalExpression(input string) any {
@@ -353,7 +358,7 @@ func testFloatObject(t *testing.T, obj any, expect float64) bool {
 	return true
 }
 
-var re, _ = regexp.Compile(`evaluator_test:\d+:\d+:`)
+var re, _ = regexp.Compile(`runtime error:(\nevaluator_test:\d+:\d+: )+`)
 
 func testErrors(t *testing.T, err *bytes.Buffer, expect string) bool {
 	errStr := err.String()

@@ -28,7 +28,7 @@ func Init(in io.Reader, out, err io.Writer) {
 	ctxt = context.New(in, out, err)
 }
 
-func recoverHandler() {
+func recoveryHandler() {
 	err := recover()
 
 	if err != nil {
@@ -42,14 +42,14 @@ func recoverHandler() {
 			default:
 				io.WriteString(ctxt.Err, "can only return integer exit codes at top level\n")
 			}
-		default:
-			io.WriteString(ctxt.Err, fmt.Sprintf("recovering: %v", e))
+		case error:
+			io.WriteString(ctxt.Err, fmt.Sprintf("runtime error:%v", e)+"\n")
 		}
 	}
 }
 
 func Evaluate(program *ast.Program) {
-	defer recoverHandler()
+	defer recoveryHandler()
 	evalStatements(program.Statements)
 }
 
@@ -60,8 +60,8 @@ func exprErrorHandler(expr ast.Expression) {
 		switch err.(type) {
 		case returnObject:
 			panic(err)
-		default:
-			io.WriteString(ctxt.Err, fmt.Sprintf("%s %s\n", expr.Location(), err))
+		case error:
+			panic(fmt.Errorf("\n%s %s", expr.Location(), err))
 		}
 	}
 }
@@ -73,8 +73,8 @@ func stmtErrorHandler(stmt ast.Statement) {
 		switch err.(type) {
 		case returnObject:
 			panic(err)
-		default:
-			io.WriteString(ctxt.Err, fmt.Sprintf("%s %s\n", stmt.Location(), err))
+		case error:
+			panic(fmt.Errorf("\n%s %s", stmt.Location(), err))
 		}
 	}
 }
@@ -113,21 +113,15 @@ func evalFunctionStatement(s *ast.FunctionStatement) {
 	name := s.Ident.Value
 	init := evalExpression(s.Value)
 	if !ctxt.Env.Set(name, init) {
-		panic(fmt.Sprintf("variable %s already exists in current scope", name))
+		panic(fmt.Errorf("variable %s already exists in current scope", name))
 	}
 }
 
 func evalLetStatement(s *ast.LetStatement) {
-	init := evalExpression(s.InitValue)
-	if init == nil {
-		// some error occured
-		// do not initialise variable
-		return
-	}
-
 	name := s.Ident.Value
+	init := evalExpression(s.InitValue)
 	if !ctxt.Env.Set(name, init) {
-		panic(fmt.Sprintf("variable %s already exists in current scope", name))
+		panic(fmt.Errorf("variable %s already exists in current scope", name))
 	}
 }
 
@@ -170,7 +164,7 @@ func evalExpression(expr ast.Expression) any {
 	case *ast.CallExpression:
 		return evalCallExpression(e)
 	default:
-		panic(fmt.Sprintf("unknown expression type %T", expr))
+		panic(fmt.Errorf("unknown expression type %T", expr))
 	}
 }
 
@@ -181,9 +175,6 @@ func evalCallExpression(e *ast.CallExpression) any {
 	}
 
 	args := evalCallArgs(e.Arguments)
-	if args == nil {
-		return nil
-	}
 	return callFunction(value, args)
 }
 
@@ -191,9 +182,6 @@ func evalCallArgs(args []ast.Expression) []any {
 	result := make([]any, 0)
 	for _, e := range args {
 		arg := evalExpression(e)
-		if arg == nil {
-			return nil
-		}
 		result = append(result, arg)
 	}
 
@@ -221,7 +209,7 @@ func callFunction(fn any, args []any) (retValue any) {
 
 		function := obj.fn
 		if len(args) != len(function.Parameters) {
-			panic(fmt.Sprintf("incorrect no of arguments. got=%d, expect=%d",
+			panic(fmt.Errorf("incorrect no of arguments. got=%d, expect=%d",
 				len(args), len(function.Parameters)))
 		}
 
@@ -230,11 +218,13 @@ func callFunction(fn any, args []any) (retValue any) {
 		}
 
 		evalStatements(function.Body.Statements)
-		panic("should not reach here") // unreachable
+		// reaching here means function does not return any value
+		// for in one of the flow paths
+		panic(returnObject{nil})
 	case context.BuiltIn:
 		return obj(args...)
 	default:
-		panic(fmt.Sprintf("not a callable %s", typeStr(fn)))
+		panic(fmt.Errorf("not a callable %s", typeStr(fn)))
 	}
 }
 
@@ -253,7 +243,7 @@ func evalIdentifier(e *ast.Identifier) any {
 		return value
 	}
 
-	panic(fmt.Sprintf("variable not found: %s", e.Value))
+	panic(fmt.Errorf("variable not found: %s", e.Value))
 }
 
 func evalInfixExpression(e *ast.InfixExpression) any {
@@ -289,7 +279,7 @@ func evalInfixExpression(e *ast.InfixExpression) any {
 	case "!=":
 		return !evalEqOperator(left, right)
 	default:
-		panic(fmt.Sprintf("unknown operator %s", e.Operator))
+		panic(fmt.Errorf("unknown operator %s", e.Operator))
 	}
 }
 
@@ -302,7 +292,7 @@ func evalAddOperator(left, right any) any {
 		case float64:
 			return float64(l) + r
 		default:
-			panic(fmt.Sprintf("addition not supported for %s and %s", typeStr(l), typeStr(r)))
+			panic(fmt.Errorf("addition not supported for %s and %s", typeStr(l), typeStr(r)))
 		}
 	case float64:
 		switch r := right.(type) {
@@ -311,10 +301,10 @@ func evalAddOperator(left, right any) any {
 		case float64:
 			return l + r
 		default:
-			panic(fmt.Sprintf("addition not supported for %s and %s", typeStr(l), typeStr(r)))
+			panic(fmt.Errorf("addition not supported for %s and %s", typeStr(l), typeStr(r)))
 		}
 	default:
-		panic(fmt.Sprintf("addition not supported for %s", typeStr(l)))
+		panic(fmt.Errorf("addition not supported for %s", typeStr(l)))
 	}
 }
 
@@ -327,7 +317,7 @@ func evalSubOperator(left, right any) any {
 		case float64:
 			return float64(l) - r
 		default:
-			panic(fmt.Sprintf("subtraction not supported for %s and %s", typeStr(l), typeStr(r)))
+			panic(fmt.Errorf("subtraction not supported for %s and %s", typeStr(l), typeStr(r)))
 		}
 	case float64:
 		switch r := right.(type) {
@@ -336,10 +326,10 @@ func evalSubOperator(left, right any) any {
 		case float64:
 			return l - r
 		default:
-			panic(fmt.Sprintf("subtraction not supported for %s and %s", typeStr(l), typeStr(r)))
+			panic(fmt.Errorf("subtraction not supported for %s and %s", typeStr(l), typeStr(r)))
 		}
 	default:
-		panic(fmt.Sprintf("subtraction not supported for %s", typeStr(l)))
+		panic(fmt.Errorf("subtraction not supported for %s", typeStr(l)))
 	}
 }
 
@@ -352,7 +342,7 @@ func evalMulOperator(left, right any) any {
 		case float64:
 			return float64(l) * r
 		default:
-			panic(fmt.Sprintf("multiplication not supported for %s and %s", typeStr(l), typeStr(r)))
+			panic(fmt.Errorf("multiplication not supported for %s and %s", typeStr(l), typeStr(r)))
 		}
 	case float64:
 		switch r := right.(type) {
@@ -361,10 +351,10 @@ func evalMulOperator(left, right any) any {
 		case float64:
 			return l * r
 		default:
-			panic(fmt.Sprintf("multiplication not supported for %s and %s", typeStr(l), typeStr(r)))
+			panic(fmt.Errorf("multiplication not supported for %s and %s", typeStr(l), typeStr(r)))
 		}
 	default:
-		panic(fmt.Sprintf("multiplication not supported for %s", typeStr(l)))
+		panic(fmt.Errorf("multiplication not supported for %s", typeStr(l)))
 	}
 }
 
@@ -377,7 +367,7 @@ func evalDivOperator(left, right any) any {
 		case float64:
 			return float64(l) / r
 		default:
-			panic(fmt.Sprintf("division not supported for %s and %s", typeStr(l), typeStr(r)))
+			panic(fmt.Errorf("division not supported for %s and %s", typeStr(l), typeStr(r)))
 		}
 	case float64:
 		switch r := right.(type) {
@@ -386,10 +376,10 @@ func evalDivOperator(left, right any) any {
 		case float64:
 			return l / r
 		default:
-			panic(fmt.Sprintf("division not supported for %s and %s", typeStr(l), typeStr(r)))
+			panic(fmt.Errorf("division not supported for %s and %s", typeStr(l), typeStr(r)))
 		}
 	default:
-		panic(fmt.Sprintf("division not supported for %s", typeStr(l)))
+		panic(fmt.Errorf("division not supported for %s", typeStr(l)))
 	}
 }
 
@@ -402,7 +392,7 @@ func evalLtOperator(left, right any) bool {
 		case float64:
 			return float64(l) < r
 		default:
-			panic(fmt.Sprintf("cannot compare types %s and %s", typeStr(l), typeStr(r)))
+			panic(fmt.Errorf("cannot compare types %s and %s", typeStr(l), typeStr(r)))
 		}
 	case float64:
 		switch r := right.(type) {
@@ -411,10 +401,10 @@ func evalLtOperator(left, right any) bool {
 		case float64:
 			return l < r
 		default:
-			panic(fmt.Sprintf("cannot compare types %s and %s", typeStr(l), typeStr(r)))
+			panic(fmt.Errorf("cannot compare types %s and %s", typeStr(l), typeStr(r)))
 		}
 	default:
-		panic(fmt.Sprintf("comparison not supported for %s", typeStr(l)))
+		panic(fmt.Errorf("comparison not supported for %s", typeStr(l)))
 	}
 }
 
@@ -466,7 +456,7 @@ func evalPrefixExpression(e *ast.PrefixExpression) any {
 	case "-":
 		return evalNegateOperator(right)
 	default:
-		panic(fmt.Sprintf("unknown operator %s", e.Operator))
+		panic(fmt.Errorf("unknown operator %s", e.Operator))
 	}
 }
 
@@ -481,7 +471,7 @@ func evalNegateOperator(e any) any {
 	case float64:
 		return -v
 	default:
-		panic(fmt.Sprintf("cannot negate value of type %s", typeStr(e)))
+		panic(fmt.Errorf("cannot negate value of type %s", typeStr(e)))
 	}
 }
 

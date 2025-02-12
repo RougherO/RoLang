@@ -30,9 +30,18 @@ func New(in io.Reader, out, err io.Writer) *Context {
 
 	c.builtins = map[string]BuiltIn{
 		"puts": func(args ...any) any {
-			for _, value := range args {
-				fmt.Printf("%v\n", value)
+			var out string
+			for i, arg := range args {
+				if arg == nil {
+					arg = "null"
+				}
+				if i == 0 {
+					out += fmt.Sprintf("%v", arg)
+				} else {
+					out += ", " + fmt.Sprintf("%v", arg)
+				}
 			}
+			io.WriteString(c.Out, out+"\n")
 			return nil
 		},
 	}
