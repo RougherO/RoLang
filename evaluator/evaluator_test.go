@@ -1,6 +1,7 @@
 package evaluator
 
 import (
+	"RoLang/evaluator/env"
 	"RoLang/lexer"
 	"RoLang/parser"
 	"regexp"
@@ -212,7 +213,6 @@ func TestBooleanExpression(t *testing.T) {
 
 func TestErrorStatements(t *testing.T) {
 	err := new(bytes.Buffer)
-
 	Init(nil, nil, err)
 
 	tests := []struct {
@@ -222,9 +222,11 @@ func TestErrorStatements(t *testing.T) {
 		// {"let x = 1", "expected next token to be \";\", got \"eof\" instead"},
 		{"let x = y;", "variable not found: y"},
 		{"let x = 1; let y = x();", "not a callable int"},
+		{"fn f(){} let x = f(); x();", "cannot function call on null objects"},
 	}
 
 	for i, test := range tests {
+		ctxt.Env = env.New(nil) // reset environement for each test to prevent name clash
 		testEvalStatements(test.input)
 		if !testErrors(t, err, test.expect) {
 			t.Logf("test[%d]\n", i)

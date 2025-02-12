@@ -171,7 +171,8 @@ func evalExpression(expr ast.Expression) any {
 func evalCallExpression(e *ast.CallExpression) any {
 	value := evalExpression(e.Callee)
 	if value == nil {
-		return nil
+		// trying to call on a null object
+		panic(fmt.Errorf("cannot function call on null objects"))
 	}
 
 	args := evalCallArgs(e.Arguments)
