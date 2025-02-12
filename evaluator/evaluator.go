@@ -171,7 +171,8 @@ func evalExpression(expr ast.Expression) any {
 func evalCallExpression(e *ast.CallExpression) any {
 	value := evalExpression(e.Callee)
 	if value == nil {
-		return nil
+		// trying to call on a null object
+		panic(fmt.Errorf("cannot function call on null objects"))
 	}
 
 	args := evalCallArgs(e.Arguments)
@@ -219,7 +220,7 @@ func callFunction(fn any, args []any) (retValue any) {
 
 		evalStatements(function.Body.Statements)
 		// reaching here means function does not return any value
-		// for in one of the flow paths
+		// in one of the control flow paths
 		panic(returnObject{nil})
 	case context.BuiltIn:
 		return obj(args...)
