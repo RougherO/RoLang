@@ -26,6 +26,9 @@ const (
 	LE // "<="
 	GE // ">="
 
+	AND // "&&"
+	OR  // "||"
+
 	// Delimeters
 	COMMA  // ","
 	SEMCOL // ";"
