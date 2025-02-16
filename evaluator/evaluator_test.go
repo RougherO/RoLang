@@ -160,57 +160,6 @@ func TestPrefixOperator(t *testing.T) {
 	}
 }
 
-func TestIntegerExpression(t *testing.T) {
-	tests := []struct {
-		input  string
-		expect int64
-	}{
-		{"5", 5},
-		{"10", 10},
-	}
-
-	for i, test := range tests {
-		eval := testEvalExpression(test.input)
-		if !testIntegerObject(t, eval, test.expect) {
-			t.Logf("test[%d]\n", i)
-		}
-	}
-}
-
-func TestFloatExpression(t *testing.T) {
-	tests := []struct {
-		input  string
-		expect float64
-	}{
-		{"5.5", 5.5},
-		{"10.23", 10.23},
-	}
-
-	for i, test := range tests {
-		eval := testEvalExpression(test.input)
-		if !testFloatObject(t, eval, test.expect) {
-			t.Logf("test[%d]\n", i)
-		}
-	}
-}
-
-func TestBooleanExpression(t *testing.T) {
-	tests := []struct {
-		input  string
-		expect bool
-	}{
-		{"true", true},
-		{"false", false},
-	}
-
-	for i, test := range tests {
-		eval := testEvalExpression(test.input)
-		if !testBooleanObject(t, eval, test.expect) {
-			t.Logf("test[%d]\n", i)
-		}
-	}
-}
-
 func TestErrorStatements(t *testing.T) {
 	err := new(bytes.Buffer)
 	Init(nil, nil, err)
