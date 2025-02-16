@@ -25,6 +25,10 @@ func TestFunctionStatement(t *testing.T) {
 	// TODO need tests
 }
 
+func TestBuiltInFunctions(t *testing.T) {
+	// TODO need tests
+}
+
 func TestIfStatement(t *testing.T) {
 	// TODO need tests
 }

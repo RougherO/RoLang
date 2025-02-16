@@ -1,8 +1,8 @@
 package context
 
 import (
-	"RoLang/ast"
 	"RoLang/evaluator/env"
+	"RoLang/evaluator/objects"
 
 	"fmt"
 	"io"
@@ -56,14 +56,49 @@ func New(in io.Reader, out, err io.Writer) *Context {
 					out += strconv.FormatFloat(v, 'f', -1, 64)
 				case string:
 					out += v
-				case *ast.FunctionLiteral:
-					out += "func"
+				case objects.FuncObject:
+					out += "function"
 				case nil:
 					out += "null"
 				default:
 				}
 			}
 			return out
+		},
+		"len": func(args ...any) any {
+			if len(args) != 1 {
+				panic(fmt.Errorf("\n`len` expects only 1 argument, got=%d", len(args)))
+			}
+			switch v := args[0].(type) {
+			case string:
+				return len(v)
+			default:
+				panic(fmt.Errorf("\nargument type not supported for `len`, got=%v", c.builtins["type"](v)))
+			}
+		},
+		"type": func(args ...any) any {
+			if len(args) != 1 {
+				panic(fmt.Errorf("\n`type` expects only 1 argument, got=%d", len(args)))
+			}
+
+			switch args[0].(type) {
+			case int64:
+				return "int"
+			case float64:
+				return "float"
+			case string:
+				return "string"
+			case bool:
+				return "bool"
+			case objects.FuncObject:
+				return "function"
+			case BuiltIn:
+				return "builtin"
+			case nil:
+				return "null"
+			default:
+				return "<unknown>"
+			}
 		},
 	}
 

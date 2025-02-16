@@ -3,21 +3,11 @@ package evaluator
 import (
 	"RoLang/ast"
 	"RoLang/evaluator/context"
-	"RoLang/evaluator/env"
+	"RoLang/evaluator/objects"
 
 	"fmt"
 	"io"
 	"os"
-)
-
-type (
-	returnObject struct {
-		value any
-	}
-	fnObject struct {
-		env *env.Environment
-		fn  *ast.FunctionLiteral
-	}
 )
 
 // global context variable to maintain
@@ -33,8 +23,8 @@ func recoveryHandler() {
 
 	if err != nil {
 		switch e := err.(type) {
-		case returnObject:
-			switch e := e.value.(type) {
+		case objects.ReturnObject:
+			switch e := e.Value.(type) {
 			case int64:
 				os.Exit(int(e))
 			case nil:
@@ -58,7 +48,7 @@ func exprErrorHandler(expr ast.Expression) {
 
 	if err != nil {
 		switch err.(type) {
-		case returnObject:
+		case objects.ReturnObject:
 			panic(err)
 		case error:
 			panic(fmt.Errorf("\n%s %s", expr.Location(), err))
@@ -71,7 +61,7 @@ func stmtErrorHandler(stmt ast.Statement) {
 
 	if err != nil {
 		switch err.(type) {
-		case returnObject:
+		case objects.ReturnObject:
 			panic(err)
 		case error:
 			panic(fmt.Errorf("\n%s %s", stmt.Location(), err))
@@ -130,7 +120,7 @@ func evalReturnStatement(s *ast.ReturnStatement) {
 	if s.ReturnValue != nil {
 		retValue = evalExpression(s.ReturnValue)
 	}
-	panic(returnObject{value: retValue})
+	panic(objects.ReturnObject{Value: retValue})
 }
 
 func evalIfStatement(s *ast.IfStatement) {
@@ -193,14 +183,14 @@ func evalCallArgs(args []ast.Expression) []any {
 
 func callFunction(fn any, args []any) (retValue any) {
 	switch obj := fn.(type) {
-	case *fnObject:
+	case objects.FuncObject:
 		returnRetriever := func() {
 			ctxt.ResetEnv()
 
 			err := recover()
 			switch val := err.(type) {
-			case returnObject:
-				retValue = val.value // is a return value
+			case objects.ReturnObject:
+				retValue = val.Value // is a return value
 			default:
 				panic(retValue) // some runtime error
 			}
@@ -208,9 +198,9 @@ func callFunction(fn any, args []any) (retValue any) {
 		defer returnRetriever() // set return value or propagate error
 
 		// create new scope with the function's
-		ctxt.SetEnv(obj.env)
+		ctxt.SetEnv(obj.Env)
 
-		function := obj.fn
+		function := obj.Fn
 		if len(args) != len(function.Parameters) {
 			panic(fmt.Errorf("incorrect no of arguments. got=%d, expect=%d",
 				len(args), len(function.Parameters)))
@@ -223,7 +213,7 @@ func callFunction(fn any, args []any) (retValue any) {
 		evalStatements(function.Body.Statements)
 		// reaching here means function does not return any value
 		// in one of the control flow paths
-		panic(returnObject{nil})
+		panic(objects.ReturnObject{Value: nil})
 	case context.BuiltIn:
 		return obj(args...)
 	default:
@@ -231,10 +221,10 @@ func callFunction(fn any, args []any) (retValue any) {
 	}
 }
 
-func evalFunctionLiteral(e *ast.FunctionLiteral) *fnObject {
-	return &fnObject{
-		env: ctxt.Env,
-		fn:  e,
+func evalFunctionLiteral(e *ast.FunctionLiteral) objects.FuncObject {
+	return objects.FuncObject{
+		Env: ctxt.Env,
+		Fn:  e,
 	}
 }
 
@@ -500,27 +490,11 @@ func valueStr(val any) string {
 	return str(val).(string)
 }
 
-func typeStr(ty any) string {
-	if ty == nil {
-		return "null"
-	}
+func typeStr(val any) string {
+	f, _ := ctxt.GetBuiltIn("type")
+	ty := f.(context.BuiltIn)
 
-	switch ty.(type) {
-	case int64:
-		return "int"
-	case float64:
-		return "float"
-	case string:
-		return "string"
-	case bool:
-		return "bool"
-	case fnObject:
-		return "function"
-	case context.BuiltIn:
-		return "builtin"
-	default:
-		return "<unknown>"
-	}
+	return ty(val).(string)
 }
 
 func isTruthy(value any) bool {
