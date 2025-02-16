@@ -6,6 +6,7 @@ import (
 	"RoLang/token"
 
 	"fmt"
+	"regexp"
 	"strconv"
 	"testing"
 )
@@ -123,6 +124,7 @@ return 10.233;
 return x;
 return -2;
 return 1 + 2;
+return "hello";
 `
 	l := lexer.New("parser_test_return", input)
 	p := New(l)
@@ -130,8 +132,8 @@ return 1 + 2;
 	program := p.Parse()
 	checkErrors(t, p)
 
-	if n := len(program.Statements); n != 6 {
-		t.Fatalf("program.Statements does not contain 6 statements. got=%d", n)
+	if n := len(program.Statements); n != 7 {
+		t.Fatalf("program.Statements does not contain 7 statements. got=%d", n)
 	}
 
 	tests := []struct {
@@ -143,6 +145,7 @@ return 1 + 2;
 		{func(t *testing.T, expr ast.Expression) bool { return testPrimaryExpression(t, expr, "x") }},
 		{func(t *testing.T, expr ast.Expression) bool { return testPrefixExpression(t, expr, "-", 2) }},
 		{func(t *testing.T, expr ast.Expression) bool { return testInfixExpression(t, expr, 1, "+", 2) }},
+		{func(t *testing.T, expr ast.Expression) bool { return testPrimaryExpression(t, expr, `str(hello)`) }},
 	}
 
 	for i, test := range tests {
@@ -623,11 +626,35 @@ func TestFloatLiteralExpression(t *testing.T) {
 
 	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
 	if !ok {
-		t.Fatalf("program.Statements[0] is not ast.ExpressionStatement. got=%T",
+		t.Fatalf("program.Statements[0] is not *ast.ExpressionStatement. got=%T",
 			program.Statements[0])
 	}
 
 	if !testFloatLiteral(t, stmt.Expression, expectNum) {
+		return
+	}
+}
+
+func TestStringLiteralExpression(t *testing.T) {
+	input := `"hello world";`
+	expectStr := "hello world"
+
+	l := lexer.New("parser_test_string", input)
+	p := New(l)
+
+	program := p.Parse()
+	checkErrors(t, p)
+
+	if n := len(program.Statements); n != 1 {
+		t.Fatalf("program has not enough statements. got=%d", n)
+	}
+
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] is not *ast.ExpressionStatement. got=%T", program.Statements[0])
+	}
+
+	if !testStringLiteral(t, stmt.Expression, expectStr) {
 		return
 	}
 }
@@ -856,6 +883,8 @@ func testPrefixExpression(t *testing.T, expr ast.Expression,
 	return true
 }
 
+var re, _ = regexp.Compile(`str\((\w*)\)`)
+
 func testPrimaryExpression(t *testing.T, expr ast.Expression, expect interface{}) bool {
 	switch v := expect.(type) {
 	case int64:
@@ -865,6 +894,12 @@ func testPrimaryExpression(t *testing.T, expr ast.Expression, expect interface{}
 	case float64:
 		return testFloatLiteral(t, expr, v)
 	case string:
+		// to distinguish between string literals and identifers
+		// we surround string literals with str(...)
+		if re.MatchString(v) {
+			str := re.FindStringSubmatch(v)[1]
+			return testStringLiteral(t, expr, str)
+		}
 		return testIdentifier(t, expr, v)
 	case bool:
 		return testBooleanLiteral(t, expr, v)
@@ -904,6 +939,21 @@ func testIdentifier(t *testing.T, expr ast.Expression, value string) bool {
 
 	if word := ident.TokenWord(); word != value {
 		t.Errorf("ident.TokenWord() not %q. got=%q", value, word)
+		return false
+	}
+
+	return true
+}
+
+func testStringLiteral(t *testing.T, expr ast.Expression, value string) bool {
+	l, ok := expr.(*ast.StringLiteral)
+	if !ok {
+		t.Errorf("expr not *ast.StringLiteral. got=%T", expr)
+		return false
+	}
+
+	if l.Value != value {
+		t.Errorf("l.Value not %q. got=%q", value, l.Value)
 		return false
 	}
 

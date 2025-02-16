@@ -94,6 +94,11 @@ type (
 		Body       *BlockStatement
 	}
 
+	StringLiteral struct {
+		Token token.Token
+		Value string
+	}
+
 	IntegerLiteral struct {
 		Token token.Token
 		Value int64
@@ -364,6 +369,20 @@ func (fl *FloatLiteral) Location() token.SrcLoc {
 }
 
 func (fl *FloatLiteral) Expression() {}
+
+func (sl *StringLiteral) TokenWord() string {
+	return sl.Token.Word
+}
+
+func (sl *StringLiteral) String() string {
+	return `"` + sl.TokenWord() + `"`
+}
+
+func (sl *StringLiteral) Location() token.SrcLoc {
+	return sl.Token.Loc
+}
+
+func (sl *StringLiteral) Expression() {}
 
 func (bl *BoolLiteral) TokenWord() string {
 	return bl.Token.Word

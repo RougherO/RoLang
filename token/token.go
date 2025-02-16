@@ -7,9 +7,10 @@ const (
 	EOF
 
 	// Identifiers and literals
-	IDENT // x, y, name
-	INT   // 1032
-	FLOAT // 5.2, 0.23
+	IDENT  // x, y, name
+	INT    // 1032
+	FLOAT  // 5.2, 0.23
+	STRING // "hello" "world"
 
 	// Operators
 	ASSIGN // "="

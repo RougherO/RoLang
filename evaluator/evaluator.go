@@ -153,6 +153,8 @@ func evalExpression(expr ast.Expression) any {
 		return evalPrefixExpression(e)
 	case *ast.Identifier:
 		return evalIdentifier(e)
+	case *ast.StringLiteral:
+		return e.Value
 	case *ast.BoolLiteral:
 		return e.Value
 	case *ast.IntegerLiteral:

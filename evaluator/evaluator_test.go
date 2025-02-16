@@ -60,6 +60,12 @@ func TestLetStatement(t *testing.T) {
 				{"c", 16.0},
 			},
 		},
+		{
+			`let s = "hello world";`,
+			[]expectType{
+				{"s", "hello world"},
+			},
+		},
 	}
 
 	for i, test := range tests {

@@ -50,9 +50,13 @@ func New(lexer *lexer.Lexer) *Parser {
 		errors: []string{},
 	}
 
+	// TODO put this into a global variable so that every time a parser
+	// is created it refers to the same table instead of creating and filling
+	// a new table
 	p.table = [token.TOTAL]Entry{
 		// prefix expression do not need a precedence
 		token.LPAREN: {p.parseGroupedExpression, p.parseCallExpression, POSTFIX},
+		token.STRING: {p.parseStringLiteral, nil, NONE},
 		token.IDENT:  {p.parseIdentifier, nil, NONE},
 		token.FN:     {p.parseFunctionLiteral, nil, NONE},
 		token.INT:    {p.parseIntegerLiteral, nil, NONE},
@@ -486,6 +490,13 @@ func (p *Parser) parseFunctionParameters() []*ast.Identifier {
 	}
 
 	return idents
+}
+
+func (p *Parser) parseStringLiteral() ast.Expression {
+	return &ast.StringLiteral{
+		Token: p.currToken,
+		Value: p.currToken.Word,
+	}
 }
 
 func (p *Parser) parseIntegerLiteral() ast.Expression {

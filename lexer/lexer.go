@@ -54,6 +54,8 @@ func (l *Lexer) NextToken() token.Token {
 		tok = l.makeToken(token.STAR, "*")
 	case '/':
 		tok = l.makeToken(token.SLASH, "/")
+	case '"':
+		tok = l.readString()
 	case '=':
 		if l.peekChar() == '=' {
 			l.readChar()
@@ -126,6 +128,20 @@ func (l *Lexer) makeErr(message string) token.Token {
 		Type: token.ERR,
 		Word: message,
 	}
+}
+
+func (l *Lexer) readString() token.Token {
+	l.readChar() // consume '"'
+
+	start := l.offset - 1
+
+	for l.char != '"' && l.char != 0 {
+		l.readChar()
+	}
+
+	word := l.input[start : l.offset-1]
+
+	return l.makeToken(token.STRING, word)
 }
 
 func (l *Lexer) readIdent() token.Token {

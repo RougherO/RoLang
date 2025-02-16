@@ -28,6 +28,8 @@ if 5 < 10 {
 
 10 == 10;
 10 != 9.99;
+"foobar"
+"foo bar"
 `
 
 	tests := []struct {
@@ -105,6 +107,9 @@ if 5 < 10 {
 		{token.NE, "!="},
 		{token.FLOAT, "9.99"},
 		{token.SEMCOL, ";"},
+		{token.STRING, "foobar"},
+		{token.STRING, "foo bar"},
+		{token.EOF, "eof"},
 	}
 
 	lexer := New("lexer_test", input)
