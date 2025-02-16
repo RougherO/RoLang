@@ -294,6 +294,8 @@ func evalAddOperator(left, right any) any {
 			return l + r
 		case float64:
 			return float64(l) + r
+		case string:
+			return valueStr(l) + valueStr(r)
 		default:
 			panic(fmt.Errorf("addition not supported for %s and %s", typeStr(l), typeStr(r)))
 		}
@@ -303,6 +305,19 @@ func evalAddOperator(left, right any) any {
 			return l + float64(r)
 		case float64:
 			return l + r
+		case string:
+			return valueStr(l) + valueStr(r)
+		default:
+			panic(fmt.Errorf("addition not supported for %s and %s", typeStr(l), typeStr(r)))
+		}
+	case string:
+		switch r := right.(type) {
+		case string:
+			return valueStr(l) + valueStr(r)
+		case int64:
+			return valueStr(l) + valueStr(r)
+		case float64:
+			return valueStr(l) + valueStr(r)
 		default:
 			panic(fmt.Errorf("addition not supported for %s and %s", typeStr(l), typeStr(r)))
 		}
@@ -476,6 +491,13 @@ func evalNegateOperator(e any) any {
 	default:
 		panic(fmt.Errorf("cannot negate value of type %s", typeStr(e)))
 	}
+}
+
+func valueStr(val any) string {
+	f, _ := ctxt.GetBuiltIn("str")
+	str := f.(context.BuiltIn)
+
+	return str(val).(string)
 }
 
 func typeStr(ty any) string {

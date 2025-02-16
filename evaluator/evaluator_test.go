@@ -131,6 +131,8 @@ func TestInfixOperator(t *testing.T) {
 		{"(1 < 2) == false", false},
 		{"(1 > 2) == true", false},
 		{"(1 > 2) == false", true},
+		{`"hello" + 1`, "hello1"},
+		{`1 + "hello" + 2.23`, "1hello2.23"},
 	}
 
 	for i, test := range tests {
@@ -259,6 +261,8 @@ func testPrimaryObject(t *testing.T, obj any, expect any) bool {
 		return testIntegerObject(t, obj, int64(e))
 	case float64:
 		return testFloatObject(t, obj, e)
+	case string:
+		return testStringObject(t, obj, e)
 	case bool:
 		return testBooleanObject(t, obj, e)
 	default:
@@ -268,11 +272,7 @@ func testPrimaryObject(t *testing.T, obj any, expect any) bool {
 }
 
 func testBooleanObject(t *testing.T, obj any, expect bool) bool {
-	result, ok := obj.(bool)
-	if !ok {
-		t.Errorf("object is not Boolean. got=%T", obj)
-		return false
-	}
+	result, _ := obj.(bool)
 
 	if result != expect {
 		t.Errorf("object has wrong value. got=%t, want=%t", result, expect)
@@ -282,12 +282,19 @@ func testBooleanObject(t *testing.T, obj any, expect bool) bool {
 	return true
 }
 
-func testIntegerObject(t *testing.T, obj any, expect int64) bool {
-	result, ok := obj.(int64)
-	if !ok {
-		t.Errorf("object is not Integer. got=%T", obj)
+func testStringObject(t *testing.T, obj any, expect string) bool {
+	result, _ := obj.(string)
+
+	if result != expect {
+		t.Errorf("object has wrong value. got=%q, want=%q", result, expect)
 		return false
 	}
+
+	return true
+}
+
+func testIntegerObject(t *testing.T, obj any, expect int64) bool {
+	result, _ := obj.(int64)
 
 	if result != expect {
 		t.Errorf("object has wrong value. got=%d, want=%d", result, expect)
@@ -298,11 +305,7 @@ func testIntegerObject(t *testing.T, obj any, expect int64) bool {
 }
 
 func testFloatObject(t *testing.T, obj any, expect float64) bool {
-	result, ok := obj.(float64)
-	if !ok {
-		t.Errorf("object is not Float. got=%T", obj)
-		return false
-	}
+	result, _ := obj.(float64)
 
 	const tol = 1e-9
 

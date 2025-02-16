@@ -1,10 +1,12 @@
 package context
 
 import (
+	"RoLang/ast"
 	"RoLang/evaluator/env"
 
 	"fmt"
 	"io"
+	"strconv"
 )
 
 type BuiltIn func(...any) any
@@ -43,6 +45,25 @@ func New(in io.Reader, out, err io.Writer) *Context {
 			}
 			io.WriteString(c.Out, out+"\n")
 			return nil
+		},
+		"str": func(args ...any) any {
+			var out string
+			for _, arg := range args {
+				switch v := arg.(type) {
+				case int64:
+					out += strconv.FormatInt(v, 10)
+				case float64:
+					out += strconv.FormatFloat(v, 'f', -1, 64)
+				case string:
+					out += v
+				case *ast.FunctionLiteral:
+					out += "func"
+				case nil:
+					out += "null"
+				default:
+				}
+			}
+			return out
 		},
 	}
 
