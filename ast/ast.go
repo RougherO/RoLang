@@ -94,6 +94,11 @@ type (
 		Body       *BlockStatement
 	}
 
+	ArrayLiteral struct {
+		Token    token.Token // '[' token
+		Elements []Expression
+	}
+
 	StringLiteral struct {
 		Token token.Token
 		Value string
@@ -369,6 +374,31 @@ func (fl *FloatLiteral) Location() token.SrcLoc {
 }
 
 func (fl *FloatLiteral) Expression() {}
+
+func (al *ArrayLiteral) TokenWord() string {
+	return al.Token.Word
+}
+
+func (al *ArrayLiteral) String() string {
+	var out string
+	out += "["
+	for i, elem := range al.Elements {
+		if i == 0 {
+			out += elem.String()
+		} else {
+			out += ", " + elem.String()
+		}
+	}
+	out += "]"
+
+	return out
+}
+
+func (al *ArrayLiteral) Location() token.SrcLoc {
+	return al.Token.Loc
+}
+
+func (al *ArrayLiteral) Expression() {}
 
 func (sl *StringLiteral) TokenWord() string {
 	return sl.Token.Word

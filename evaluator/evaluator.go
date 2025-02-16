@@ -143,6 +143,8 @@ func evalExpression(expr ast.Expression) any {
 		return evalPrefixExpression(e)
 	case *ast.Identifier:
 		return evalIdentifier(e)
+	case *ast.ArrayLiteral:
+		return evalArrayLiteral(e)
 	case *ast.StringLiteral:
 		return e.Value
 	case *ast.BoolLiteral:
@@ -158,6 +160,17 @@ func evalExpression(expr ast.Expression) any {
 	default:
 		panic(fmt.Errorf("unknown expression type %T", expr))
 	}
+}
+
+func evalArrayLiteral(e *ast.ArrayLiteral) any {
+	arr := []any{}
+
+	for _, elem := range e.Elements {
+		expr := evalExpression(elem)
+		arr = append(arr, expr)
+	}
+
+	return arr
 }
 
 func evalCallExpression(e *ast.CallExpression) any {
@@ -241,15 +254,7 @@ func evalIdentifier(e *ast.Identifier) any {
 
 func evalInfixExpression(e *ast.InfixExpression) any {
 	left := evalExpression(e.Left)
-	if left == nil {
-		return nil
-	}
-
 	right := evalExpression(e.Right)
-	if right == nil {
-		return nil
-	}
-
 	switch e.Operator {
 	case "+":
 		return evalAddOperator(left, right)
@@ -454,10 +459,6 @@ func evalEqOperator(left, right any) bool {
 
 func evalPrefixExpression(e *ast.PrefixExpression) any {
 	right := evalExpression(e.Right)
-	if right == nil {
-		return nil
-	}
-
 	switch e.Operator {
 	case "!":
 		return evalBangOperator(right)

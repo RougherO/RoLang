@@ -56,6 +56,7 @@ func New(lexer *lexer.Lexer) *Parser {
 	p.table = [token.TOTAL]Entry{
 		// prefix expression do not need a precedence
 		token.LPAREN: {p.parseGroupedExpression, p.parseCallExpression, POSTFIX},
+		token.LBRACK: {p.parseArrayLiteral, nil, NONE},
 		token.STRING: {p.parseStringLiteral, nil, NONE},
 		token.IDENT:  {p.parseIdentifier, nil, NONE},
 		token.FN:     {p.parseFunctionLiteral, nil, NONE},
@@ -490,6 +491,39 @@ func (p *Parser) parseFunctionParameters() []*ast.Identifier {
 	}
 
 	return idents
+}
+
+func (p *Parser) parseArrayLiteral() ast.Expression {
+	return &ast.ArrayLiteral{
+		Token:    p.currToken,
+		Elements: p.parseArrayElements(),
+	}
+}
+
+func (p *Parser) parseArrayElements() []ast.Expression {
+	elems := []ast.Expression{}
+
+	for {
+		if p.peekToken(token.RBRACK) {
+			break
+		}
+
+		p.readToken()
+
+		expr := p.ParseExpression(NONE)
+		elems = append(elems, expr)
+
+		if !p.peekToken(token.COMMA) {
+			break
+		}
+		p.readToken() // read ','
+	}
+
+	if !p.expectToken(token.RBRACK) {
+		return nil
+	}
+
+	return elems
 }
 
 func (p *Parser) parseStringLiteral() ast.Expression {

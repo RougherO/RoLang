@@ -577,10 +577,48 @@ func TestIdentifierExpression(t *testing.T) {
 
 	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
 	if !ok {
-		t.Fatalf("program.Statements[0] not ast.ExpressionStatement. got=%T", stmt)
+		t.Fatalf("program.Statements[0] not *ast.ExpressionStatement. got=%T", stmt)
 	}
 
 	if !testIdentifier(t, stmt.Expression, expectStr) {
+		return
+	}
+}
+
+func TestArrayLiteral(t *testing.T) {
+	input := "[1, 2 * 2, 3 + 3];"
+
+	l := lexer.New("parser_test_array", input)
+	p := New(l)
+
+	program := p.Parse()
+	checkErrors(t, p)
+
+	if n := len(program.Statements); n != 1 {
+		t.Fatalf("program has not enough statements. got=%d", n)
+	}
+
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] not *ast.ExpressionStatement. got=%T", stmt)
+	}
+
+	arr, ok := stmt.Expression.(*ast.ArrayLiteral)
+	if !ok {
+		t.Fatalf("stmt.Expression not *ast.ArrayLiteral. got=%T", stmt)
+	}
+
+	if len(arr.Elements) != 3 {
+		t.Fatalf("len(arr.Elements) not 3. got=%d", len(arr.Elements))
+	}
+
+	if !testIntLiteral(t, arr.Elements[0], 1) {
+		return
+	}
+	if !testInfixExpression(t, arr.Elements[1], 2, "*", 2) {
+		return
+	}
+	if !testInfixExpression(t, arr.Elements[2], 3, "+", 3) {
 		return
 	}
 }

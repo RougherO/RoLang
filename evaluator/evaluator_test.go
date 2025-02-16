@@ -147,6 +147,30 @@ func TestInfixOperator(t *testing.T) {
 	}
 }
 
+func TestArrayLiteral(t *testing.T) {
+	input := "[1, 2 * 2, 3 + 3]"
+
+	expr := testEvalExpression(input)
+	result, ok := expr.([]any)
+	if !ok {
+		t.Fatalf("object is not Array. got=%T (%+v)", expr, expr)
+	}
+
+	if len(result) != 3 {
+		t.Fatalf("array has wrong num of elements. got=%d", len(result))
+	}
+
+	if !testIntegerObject(t, result[0], 1) {
+		return
+	}
+	if !testIntegerObject(t, result[0], 4) {
+		return
+	}
+	if !testIntegerObject(t, result[0], 6) {
+		return
+	}
+}
+
 func TestPrefixOperator(t *testing.T) {
 	tests := []struct {
 		input  string

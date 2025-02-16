@@ -72,6 +72,8 @@ func New(in io.Reader, out, err io.Writer) *Context {
 			switch v := args[0].(type) {
 			case string:
 				return len(v)
+			case []any:
+				return len(v)
 			default:
 				panic(fmt.Errorf("\nargument type not supported for `len`, got=%v", c.builtins["type"](v)))
 			}
@@ -90,6 +92,8 @@ func New(in io.Reader, out, err io.Writer) *Context {
 				return "string"
 			case bool:
 				return "bool"
+			case []any:
+				return "array"
 			case objects.FuncObject:
 				return "function"
 			case BuiltIn:
