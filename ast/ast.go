@@ -105,6 +105,16 @@ type (
 		Elements []Expression
 	}
 
+	MapElement struct {
+		Key   Expression
+		Value Expression
+	}
+
+	MapLiteral struct {
+		Token    token.Token // '{' token
+		Elements []MapElement
+	}
+
 	StringLiteral struct {
 		Token token.Token
 		Value string
@@ -419,6 +429,35 @@ func (al *ArrayLiteral) Location() token.SrcLoc {
 }
 
 func (al *ArrayLiteral) Expression() {}
+
+func (me *MapElement) String() string {
+	return fmt.Sprintf("%s:%s", me.Key, me.Value)
+}
+
+func (ml *MapLiteral) TokenWord() string {
+	return ml.Token.Word
+}
+
+func (ml *MapLiteral) String() string {
+	var out string
+	out += "{"
+	for i, elem := range ml.Elements {
+		if i == 0 {
+			out += elem.String()
+		} else {
+			out += ", " + elem.String()
+		}
+	}
+	out += "}"
+
+	return out
+}
+
+func (ml *MapLiteral) Location() token.SrcLoc {
+	return ml.Token.Loc
+}
+
+func (ml *MapLiteral) Expression() {}
 
 func (sl *StringLiteral) TokenWord() string {
 	return sl.Token.Word

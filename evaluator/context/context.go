@@ -54,6 +54,21 @@ func New(in io.Reader, out, err io.Writer) *Context {
 					out += strconv.FormatFloat(v, 'f', -1, 64)
 				case string:
 					out += v
+				case *objects.MapObject:
+					out += "{"
+					i := 0
+					for k, v := range v.Map {
+						key := c.builtins["str"](k).(string)
+						val := c.builtins["str"](v).(string)
+						elem := key + ":" + val
+						if i == 0 {
+							out += elem
+						} else {
+							out += ", " + elem
+						}
+						i++
+					}
+					out += "}"
 				case *objects.ArrayObject:
 					out += "["
 					for i, e := range v.List {
@@ -79,9 +94,11 @@ func New(in io.Reader, out, err io.Writer) *Context {
 			}
 			switch v := args[0].(type) {
 			case string:
-				return len(v)
+				return int64(len(v))
 			case *objects.ArrayObject:
-				return len(v.List)
+				return int64(len(v.List))
+			case *objects.MapObject:
+				return int64(len(v.Map))
 			default:
 				panic(fmt.Errorf("\nargument type not supported for `len`, got=%v",
 					c.builtins["type"](v)))
@@ -101,6 +118,8 @@ func New(in io.Reader, out, err io.Writer) *Context {
 				return "string"
 			case bool:
 				return "bool"
+			case *objects.MapObject:
+				return "map"
 			case *objects.ArrayObject:
 				return "array"
 			case objects.FuncObject:

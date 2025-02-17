@@ -16,6 +16,9 @@ type (
 	ArrayObject struct {
 		List []any
 	}
+	MapObject struct {
+		Map map[any]any
+	}
 )
 
 func (o *ArrayObject) Push(e any) {

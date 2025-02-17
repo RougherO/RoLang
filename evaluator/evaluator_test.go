@@ -2,8 +2,11 @@ package evaluator
 
 import (
 	"RoLang/evaluator/env"
+	"RoLang/evaluator/objects"
 	"RoLang/lexer"
 	"RoLang/parser"
+	"iter"
+	"maps"
 	"regexp"
 
 	"bytes"
@@ -151,10 +154,11 @@ func TestArrayLiteral(t *testing.T) {
 	input := "[1, 2 * 2, 3 + 3]"
 
 	expr := testEvalExpression(input)
-	result, ok := expr.([]any)
+	obj, ok := expr.(*objects.ArrayObject)
 	if !ok {
 		t.Fatalf("object is not Array. got=%T (%+v)", expr, expr)
 	}
+	result := obj.List
 
 	if len(result) != 3 {
 		t.Fatalf("array has wrong num of elements. got=%d", len(result))
@@ -167,6 +171,33 @@ func TestArrayLiteral(t *testing.T) {
 		return
 	}
 	if !testIntegerObject(t, result[2], 6) {
+		return
+	}
+}
+
+func TestMapLiteral(t *testing.T) {
+	input := `{"hello": 1, "world": 2}`
+
+	expr := testEvalExpression(input)
+	obj, ok := expr.(*objects.MapObject)
+	if !ok {
+		t.Fatalf("object is not Map. got=%T (%+v)", expr, expr)
+	}
+	result := obj.Map
+
+	if len(result) != 2 {
+		t.Fatalf("map has wrong num of elements. got=%d", len(result))
+	}
+
+	next, stop := iter.Pull2(maps.All(result))
+	defer stop()
+
+	if key, value, _ := next(); !testPrimaryObject(t, key, "hello") ||
+		!testPrimaryObject(t, value, 1) {
+		return
+	}
+	if key, value, _ := next(); !testPrimaryObject(t, key, "world") ||
+		!testPrimaryObject(t, value, 2) {
 		return
 	}
 }

@@ -145,6 +145,8 @@ func evalExpression(expr ast.Expression) any {
 		return evalIdentifier(e)
 	case *ast.ArrayLiteral:
 		return evalArrayLiteral(e)
+	case *ast.MapLiteral:
+		return evalMapLiteral(e)
 	case *ast.StringLiteral:
 		return e.Value
 	case *ast.BoolLiteral:
@@ -175,24 +177,52 @@ func evalArrayLiteral(e *ast.ArrayLiteral) *objects.ArrayObject {
 	return arr
 }
 
+func evalMapLiteral(e *ast.MapLiteral) *objects.MapObject {
+	mp := &objects.MapObject{
+		Map: make(map[any]any),
+	}
+
+	for _, elem := range e.Elements {
+		key := evalExpression(elem.Key)
+		val := evalExpression(elem.Value)
+		mp.Map[key] = val
+	}
+
+	return mp
+}
+
 func evalIndexExpression(e *ast.IndexExpression) any {
 	left := evalExpression(e.Left)
-	arr, ok := left.(*objects.ArrayObject)
-	if !ok {
-		panic(fmt.Errorf("cannot index on type %s", typeStr(left)))
-	}
+	switch v := left.(type) {
+	case *objects.ArrayObject:
+		right := evalExpression(e.Index)
+		index, ok := right.(int64)
+		if !ok {
+			panic(fmt.Errorf("expect integer index, got=%s", typeStr(index)))
+		}
 
-	right := evalExpression(e.Index)
-	index, ok := right.(int64)
-	if !ok {
-		panic(fmt.Errorf("expect integer index, got=%s", typeStr(index)))
-	}
+		if index >= int64(len(v.List)) || index < 0 {
+			panic(fmt.Errorf("index out of range [%d]", index))
+		}
 
-	if index >= int64(len(arr.List)) || index < 0 {
-		panic(fmt.Errorf("index out of range [%d]", index))
+		return v.List[index]
+	case *objects.MapObject:
+		right := evalExpression(e.Index)
+		switch right.(type) {
+		case int64:
+			return v.Map[right]
+		case float64:
+			return v.Map[right]
+		case string:
+			return v.Map[right]
+		case bool:
+			return v.Map[right]
+		default:
+			panic(fmt.Errorf("only int, float, string and bool is allowed as key. got=%s",
+				typeStr(v)))
+		}
 	}
-
-	return arr.List[index]
+	panic(fmt.Errorf("cannot index on type %s", typeStr(left)))
 }
 
 func evalCallExpression(e *ast.CallExpression) any {

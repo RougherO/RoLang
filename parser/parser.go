@@ -55,7 +55,7 @@ func New(lexer *lexer.Lexer) *Parser {
 	// a new table
 	p.table = [token.TOTAL]Entry{
 		// prefix expression do not need a precedence
-		token.LPAREN: {p.parseGroupedExpression, p.parseCallExpression, POSTFIX},
+		token.LBRACE: {p.parseMapLiteral, nil, NONE},
 		token.STRING: {p.parseStringLiteral, nil, NONE},
 		token.IDENT:  {p.parseIdentifier, nil, NONE},
 		token.FN:     {p.parseFunctionLiteral, nil, NONE},
@@ -65,6 +65,7 @@ func New(lexer *lexer.Lexer) *Parser {
 		token.FALSE:  {p.parseBoolLiteral, nil, NONE},
 		token.BANG:   {p.parsePrefixExpression, nil, NONE},
 		token.MINUS:  {p.parsePrefixExpression, p.parseInfixExpression, SUM},
+		token.LPAREN: {p.parseGroupedExpression, p.parseCallExpression, POSTFIX},
 		token.LBRACK: {p.parseArrayLiteral, p.parseIndexExpression, POSTFIX},
 		token.PLUS:   {nil, p.parseInfixExpression, SUM},
 		token.STAR:   {nil, p.parseInfixExpression, PRODUCT},
@@ -512,6 +513,55 @@ func (p *Parser) parseFunctionParameters() []*ast.Identifier {
 	}
 
 	return idents
+}
+
+func (p *Parser) parseMapLiteral() ast.Expression {
+	return &ast.MapLiteral{
+		Token:    p.currToken,
+		Elements: p.parseMapElements(),
+	}
+}
+
+func (p *Parser) parseMapElements() []ast.MapElement {
+	elems := []ast.MapElement{}
+
+	for {
+		if p.peekToken(token.RBRACE) {
+			break
+		}
+
+		p.readToken()
+
+		keyExpr := p.ParseExpression(NONE)
+		if keyExpr == nil {
+			return nil
+		}
+
+		if !p.expectToken(token.COLON) {
+			return nil
+		}
+		p.readToken()
+
+		valueExpr := p.ParseExpression(NONE)
+		if valueExpr == nil {
+			return nil
+		}
+		elems = append(elems, ast.MapElement{
+			Key:   keyExpr,
+			Value: valueExpr,
+		})
+
+		if !p.peekToken(token.COMMA) {
+			break
+		}
+		p.readToken() // consume ','
+	}
+
+	if !p.expectToken(token.RBRACE) {
+		return nil
+	}
+
+	return elems
 }
 
 func (p *Parser) parseArrayLiteral() ast.Expression {

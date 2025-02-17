@@ -12,8 +12,10 @@ import (
 )
 
 const prompt = "|> "
+const message = `RoLang v0.2 Tree-Walk Interpreter`
 
 func Start(in io.Reader, out io.Writer, err io.Writer) {
+	fmt.Println(message)
 	scanner := bufio.NewScanner(in)
 	evaluator.Init(in, out, err)
 	for {

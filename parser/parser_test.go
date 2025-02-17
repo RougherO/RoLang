@@ -655,6 +655,43 @@ func TestArrayLiteral(t *testing.T) {
 	}
 }
 
+func TestMapLiteral(t *testing.T) {
+	input := `{"one": 1, "two": 2, "three": 3}`
+
+	l := lexer.New("parser_test_map", input)
+	p := New(l)
+
+	expr := p.ParseExpression(NONE)
+	checkErrors(t, p)
+
+	hash, ok := expr.(*ast.MapLiteral)
+	if !ok {
+		t.Fatalf("expr is not ast.HashLiteral. got=%T", expr)
+	}
+
+	if len(hash.Elements) != 3 {
+		t.Errorf("hash.Elements has wrong length. got=%d", len(hash.Elements))
+	}
+
+	e0 := hash.Elements[0]
+	if !testStringLiteral(t, e0.Key, "one") ||
+		!testIntLiteral(t, e0.Value, 1) {
+		return
+	}
+
+	e1 := hash.Elements[1]
+	if !testStringLiteral(t, e1.Key, "two") ||
+		!testIntLiteral(t, e1.Value, 2) {
+		return
+	}
+
+	e2 := hash.Elements[2]
+	if !testStringLiteral(t, e2.Key, "three") ||
+		!testIntLiteral(t, e2.Value, 3) {
+		return
+	}
+}
+
 func TestIntegerLiteralExpression(t *testing.T) {
 	input := "5;"
 	expectNum := 5

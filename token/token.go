@@ -28,6 +28,7 @@ const (
 	GE // ">="
 
 	// Delimeters
+	COLON  // ":"
 	COMMA  // ","
 	SEMCOL // ";"
 
@@ -82,6 +83,7 @@ var TokenString = []string{
 	FALSE:  "false",
 	IF:     "if",
 	ELSE:   "else",
+	COLON:  ":",
 }
 
 type Token struct {

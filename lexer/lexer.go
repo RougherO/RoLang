@@ -34,6 +34,8 @@ func (l *Lexer) NextToken() token.Token {
 	l.skipWhiteSpace()
 
 	switch l.char {
+	case ':':
+		tok = l.makeToken(token.COLON, ":")
 	case ';':
 		tok = l.makeToken(token.SEMCOL, ";")
 	case '(':
