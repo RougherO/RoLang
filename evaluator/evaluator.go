@@ -157,20 +157,42 @@ func evalExpression(expr ast.Expression) any {
 		return evalFunctionLiteral(e)
 	case *ast.CallExpression:
 		return evalCallExpression(e)
+	case *ast.IndexExpression:
+		return evalIndexExpression(e)
 	default:
 		panic(fmt.Errorf("unknown expression type %T", expr))
 	}
 }
 
-func evalArrayLiteral(e *ast.ArrayLiteral) any {
-	arr := []any{}
+func evalArrayLiteral(e *ast.ArrayLiteral) *objects.ArrayObject {
+	arr := &objects.ArrayObject{}
 
 	for _, elem := range e.Elements {
 		expr := evalExpression(elem)
-		arr = append(arr, expr)
+		arr.List = append(arr.List, expr)
 	}
 
 	return arr
+}
+
+func evalIndexExpression(e *ast.IndexExpression) any {
+	left := evalExpression(e.Left)
+	arr, ok := left.(*objects.ArrayObject)
+	if !ok {
+		panic(fmt.Errorf("cannot index on type %s", typeStr(left)))
+	}
+
+	right := evalExpression(e.Index)
+	index, ok := right.(int64)
+	if !ok {
+		panic(fmt.Errorf("expect integer index, got=%s", typeStr(index)))
+	}
+
+	if index >= int64(len(arr.List)) || index < 0 {
+		panic(fmt.Errorf("index out of range [%d]", index))
+	}
+
+	return arr.List[index]
 }
 
 func evalCallExpression(e *ast.CallExpression) any {

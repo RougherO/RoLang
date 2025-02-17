@@ -41,7 +41,7 @@ const (
 	SUM                // + -
 	PRODUCT            // * /
 	PREFIX             // !x -x
-	POSTFIX            // x() x++
+	POSTFIX            // x() x++ x[1]
 )
 
 func New(lexer *lexer.Lexer) *Parser {
@@ -56,7 +56,6 @@ func New(lexer *lexer.Lexer) *Parser {
 	p.table = [token.TOTAL]Entry{
 		// prefix expression do not need a precedence
 		token.LPAREN: {p.parseGroupedExpression, p.parseCallExpression, POSTFIX},
-		token.LBRACK: {p.parseArrayLiteral, nil, NONE},
 		token.STRING: {p.parseStringLiteral, nil, NONE},
 		token.IDENT:  {p.parseIdentifier, nil, NONE},
 		token.FN:     {p.parseFunctionLiteral, nil, NONE},
@@ -66,6 +65,7 @@ func New(lexer *lexer.Lexer) *Parser {
 		token.FALSE:  {p.parseBoolLiteral, nil, NONE},
 		token.BANG:   {p.parsePrefixExpression, nil, NONE},
 		token.MINUS:  {p.parsePrefixExpression, p.parseInfixExpression, SUM},
+		token.LBRACK: {p.parseArrayLiteral, p.parseIndexExpression, POSTFIX},
 		token.PLUS:   {nil, p.parseInfixExpression, SUM},
 		token.STAR:   {nil, p.parseInfixExpression, PRODUCT},
 		token.SLASH:  {nil, p.parseInfixExpression, PRODUCT},
@@ -372,6 +372,27 @@ func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 	}
 	expr.Right = right
 
+	return expr
+}
+
+func (p *Parser) parseIndexExpression(left ast.Expression) ast.Expression {
+	expr := &ast.IndexExpression{
+		Token: p.currToken,
+		Left:  left,
+	}
+
+	p.readToken() // consume '['
+
+	index := p.ParseExpression(NONE)
+	if index == nil {
+		return nil
+	}
+
+	if !p.expectToken(token.RBRACK) {
+		return nil
+	}
+
+	expr.Index = index
 	return expr
 }
 

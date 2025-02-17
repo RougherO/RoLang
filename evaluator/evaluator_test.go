@@ -163,11 +163,42 @@ func TestArrayLiteral(t *testing.T) {
 	if !testIntegerObject(t, result[0], 1) {
 		return
 	}
-	if !testIntegerObject(t, result[0], 4) {
+	if !testIntegerObject(t, result[1], 4) {
 		return
 	}
-	if !testIntegerObject(t, result[0], 6) {
+	if !testIntegerObject(t, result[2], 6) {
 		return
+	}
+}
+
+func TestIndexExpression(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect any
+	}{
+		{
+			"[1, 2, 3][0]",
+			1,
+		},
+		{
+			"[1, 2, 3][1]",
+			2,
+		},
+		{
+			"[1, 2, 3][2]",
+			3,
+		},
+		{
+			"[1, 2, 3][1 - 1]",
+			1,
+		},
+	}
+
+	for i, test := range tests {
+		eval := testEvalExpression(test.input)
+		if !testPrimaryObject(t, eval, test.expect) {
+			t.Logf("test[%d]\n", i)
+		}
 	}
 }
 

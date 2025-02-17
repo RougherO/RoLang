@@ -83,6 +83,12 @@ type (
 		Arguments []Expression
 	}
 
+	IndexExpression struct {
+		Token token.Token // '[' token
+		Left  Expression
+		Index Expression
+	}
+
 	Identifier struct {
 		Token token.Token
 		Value string
@@ -324,6 +330,20 @@ func (ce *CallExpression) Location() token.SrcLoc {
 }
 
 func (ce *CallExpression) Expression() {}
+
+func (ie *IndexExpression) TokenWord() string {
+	return ie.Token.Word
+}
+
+func (ie *IndexExpression) String() string {
+	return fmt.Sprintf("(%s[%s])", ie.Left, ie.Index)
+}
+
+func (ie *IndexExpression) Location() token.SrcLoc {
+	return ie.Token.Loc
+}
+
+func (ie *IndexExpression) Expression() {}
 
 func (fl *FunctionLiteral) TokenWord() string {
 	return fl.Token.Word

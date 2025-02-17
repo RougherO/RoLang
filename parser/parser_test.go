@@ -561,6 +561,38 @@ func TestCallExpression(t *testing.T) {
 	}
 }
 
+func TestIndexExpression(t *testing.T) {
+	input := "arr[1 + 2];"
+
+	l := lexer.New("parser_test_index", input)
+	p := New(l)
+
+	program := p.Parse()
+	checkErrors(t, p)
+
+	if n := len(program.Statements); n != 1 {
+		t.Fatalf("program.Statements does not contain %d statements. got=%d\n", 1, n)
+	}
+
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("stmt is not ast.ExpressionStatement. got=%T", program.Statements[0])
+	}
+
+	expr, ok := stmt.Expression.(*ast.IndexExpression)
+	if !ok {
+		t.Fatalf("stmt.Expression is not ast.IndexExpression. got=%T", stmt.Expression)
+	}
+
+	if !testIdentifier(t, expr.Left, "arr") {
+		return
+	}
+
+	if !testInfixExpression(t, expr.Index, 1, "+", 2) {
+		return
+	}
+}
+
 func TestIdentifierExpression(t *testing.T) {
 	input := "foobar;"
 	expectStr := "foobar"
@@ -785,6 +817,14 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 		{
 			"!(true == true)",
 			"(!(true == true))",
+		},
+		{
+			"a * [1, 2, 3, 4][b * c] * d",
+			"((a * ([1, 2, 3, 4][(b * c)])) * d)",
+		},
+		{
+			"add(a * b[2], b[1], 2 * [1, 2][1])",
+			"add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",
 		},
 	}
 
