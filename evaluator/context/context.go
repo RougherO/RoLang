@@ -3,6 +3,7 @@ package context
 import (
 	"RoLang/evaluator/env"
 	"RoLang/evaluator/objects"
+	"maps"
 
 	"fmt"
 	"io"
@@ -60,7 +61,7 @@ func New(in io.Reader, out, err io.Writer) *Context {
 					for k, v := range v.Map {
 						key := c.builtins["str"](k).(string)
 						val := c.builtins["str"](v).(string)
-						elem := key + ":" + val
+						elem := key + ": " + val
 						if i == 0 {
 							out += elem
 						} else {
@@ -202,8 +203,14 @@ func New(in io.Reader, out, err io.Writer) *Context {
 				}
 				e := v.Pop(int(index))
 				return e // return the erased element
+			case *objects.MapObject:
+				key := args[1]
+				val := v.Map[key]
+				delete(v.Map, key)
+				return val // return value of erased key
+			default:
+				panic(fmt.Errorf("`erase` expects an array or map type, got=%s", c.builtins["type"](args[0])))
 			}
-			panic(fmt.Errorf("`erase` expects an array or map type, got=%s", c.builtins["type"](args[0])))
 		},
 		"clone": func(args ...any) any {
 			if len(args) != 1 {
@@ -213,6 +220,10 @@ func New(in io.Reader, out, err io.Writer) *Context {
 			case *objects.ArrayObject:
 				return &objects.ArrayObject{
 					List: slices.Clone(v.List),
+				}
+			case *objects.MapObject:
+				return &objects.MapObject{
+					Map: maps.Clone(v.Map),
 				}
 			}
 
@@ -226,10 +237,13 @@ func New(in io.Reader, out, err io.Writer) *Context {
 			switch v := args[0].(type) {
 			case *objects.ArrayObject:
 				v.List = v.List[:0]
-				return nil
+			case *objects.MapObject:
+				clear(v.Map)
+			default:
+				panic(fmt.Errorf("`clear` expects an array or map type, got=%s", c.builtins["type"](args[0])))
 			}
 
-			panic(fmt.Errorf("`clear` expects an array or map type, got=%s", c.builtins["type"](args[0])))
+			return nil
 		},
 	}
 
