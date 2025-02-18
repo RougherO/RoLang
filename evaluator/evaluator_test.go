@@ -5,8 +5,6 @@ import (
 	"RoLang/evaluator/objects"
 	"RoLang/lexer"
 	"RoLang/parser"
-	"iter"
-	"maps"
 	"regexp"
 
 	"bytes"
@@ -79,6 +77,22 @@ func TestLetStatement(t *testing.T) {
 		if !testLetStatements(t, test.input, test.expect) {
 			t.Logf("test[%d]\n", i)
 		}
+	}
+}
+
+func TestAssignExpression(t *testing.T) {
+	input := `let x = 1; x = 2;`
+
+	l := lexer.New("evaluator_test_assign", input)
+	p := parser.New(l)
+
+	program := p.Parse()
+
+	Init(nil, nil, nil)
+	Evaluate(program)
+
+	if !testIdentifier(t, "x", int64(2)) {
+		return
 	}
 }
 
@@ -189,15 +203,21 @@ func TestMapLiteral(t *testing.T) {
 		t.Fatalf("map has wrong num of elements. got=%d", len(result))
 	}
 
-	next, stop := iter.Pull2(maps.All(result))
-	defer stop()
+	val1, ok := result["hello"]
+	if !ok {
+		t.Fatal(`map has no key "hello"`)
+	}
 
-	if key, value, _ := next(); !testPrimaryObject(t, key, "hello") ||
-		!testPrimaryObject(t, value, 1) {
+	if !testPrimaryObject(t, val1, 1) {
 		return
 	}
-	if key, value, _ := next(); !testPrimaryObject(t, key, "world") ||
-		!testPrimaryObject(t, value, 2) {
+
+	val2, ok := result["world"]
+	if !ok {
+		t.Fatal(`map has no key "world"`)
+	}
+
+	if !testPrimaryObject(t, val2, 2) {
 		return
 	}
 }

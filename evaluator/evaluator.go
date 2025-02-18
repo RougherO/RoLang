@@ -143,6 +143,8 @@ func evalExpression(expr ast.Expression) any {
 		return evalPrefixExpression(e)
 	case *ast.Identifier:
 		return evalIdentifier(e)
+	case *ast.AssignExpression:
+		return evalAssignExpression(e)
 	case *ast.ArrayLiteral:
 		return evalArrayLiteral(e)
 	case *ast.MapLiteral:
@@ -331,6 +333,49 @@ func evalInfixExpression(e *ast.InfixExpression) any {
 	default:
 		panic(fmt.Errorf("unknown operator %s", e.Operator))
 	}
+}
+
+func evalAssignExpression(expr *ast.AssignExpression) any {
+	right := evalExpression(expr.Right)
+
+	switch left := expr.Left.(type) {
+	case *ast.Identifier:
+		if !ctxt.Env.Assign(left.Value, right) {
+			panic(fmt.Errorf("variable %q does not exist in current scope", left.Value))
+		}
+	case *ast.IndexExpression:
+		l := evalExpression(left.Left)
+		switch v := l.(type) {
+		case *objects.ArrayObject:
+			index, ok := evalExpression(left.Index).(int64)
+			if !ok {
+				panic(fmt.Errorf("expect integer index, got=%s", typeStr(index)))
+			}
+
+			if index >= int64(len(v.List)) || index < 0 {
+				panic(fmt.Errorf("index out of range [%d]", index))
+			}
+
+			v.List[index] = right
+		case *objects.MapObject:
+			index := evalExpression(left.Index)
+			switch index.(type) {
+			case int64:
+				v.Map[index] = right
+			case float64:
+				v.Map[index] = right
+			case string:
+				v.Map[index] = right
+			case bool:
+				v.Map[index] = right
+			default:
+				panic(fmt.Errorf("only int, float, string and bool is allowed as key. got=%s",
+					typeStr(v)))
+			}
+		}
+	}
+
+	return right
 }
 
 func evalAddOperator(left, right any) any {

@@ -23,6 +23,7 @@ func (e *Environment) Get(name string) (any, bool) {
 	return value, ok
 }
 
+// setting a new value using `let` statements
 func (e *Environment) Set(name string, value any) bool {
 	if _, ok := e.store[name]; ok {
 		return false
@@ -30,6 +31,20 @@ func (e *Environment) Set(name string, value any) bool {
 
 	e.store[name] = value
 	return true
+}
+
+// setting an already existing value using `=`
+func (e *Environment) Assign(name string, value any) bool {
+	if _, ok := e.store[name]; ok {
+		e.store[name] = value
+		return true
+	}
+
+	if e.outer != nil {
+		return e.Assign(name, value)
+	}
+
+	return false
 }
 
 func (e *Environment) Outer() *Environment {

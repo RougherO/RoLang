@@ -67,6 +67,7 @@ func New(lexer *lexer.Lexer) *Parser {
 		token.MINUS:  {p.parsePrefixExpression, p.parseInfixExpression, SUM},
 		token.LPAREN: {p.parseGroupedExpression, p.parseCallExpression, POSTFIX},
 		token.LBRACK: {p.parseArrayLiteral, p.parseIndexExpression, POSTFIX},
+		token.ASSIGN: {nil, p.parseAssignExpression, ASSIGN},
 		token.PLUS:   {nil, p.parseInfixExpression, SUM},
 		token.STAR:   {nil, p.parseInfixExpression, PRODUCT},
 		token.SLASH:  {nil, p.parseInfixExpression, PRODUCT},
@@ -394,6 +395,27 @@ func (p *Parser) parseIndexExpression(left ast.Expression) ast.Expression {
 	}
 
 	expr.Index = index
+	return expr
+}
+
+func (p *Parser) parseAssignExpression(left ast.Expression) ast.Expression {
+	expr := &ast.AssignExpression{
+		Token: p.currToken,
+		Left:  left,
+	}
+
+	p.readToken() // consume '='
+
+	// to make assignment right associative we reduce the
+	// precedence before parsing the right hand side
+	// to parse all assignments of rhs then assign it to this
+	right := p.ParseExpression(ASSIGN - 1)
+	if right == nil {
+		return nil
+	}
+
+	expr.Right = right
+
 	return expr
 }
 

@@ -94,6 +94,12 @@ type (
 		Value string
 	}
 
+	AssignExpression struct {
+		Token token.Token // '=' token
+		Left  Expression
+		Right Expression
+	}
+
 	FunctionLiteral struct {
 		Token      token.Token
 		Parameters []*Identifier
@@ -317,6 +323,20 @@ func (id *Identifier) Location() token.SrcLoc {
 }
 
 func (id *Identifier) Expression() {}
+
+func (ae *AssignExpression) TokenWord() string {
+	return ae.Token.Word
+}
+
+func (ae *AssignExpression) String() string {
+	return fmt.Sprintf("(%s = %s)", ae.Left, ae.Right)
+}
+
+func (ae *AssignExpression) Location() token.SrcLoc {
+	return ae.Token.Loc
+}
+
+func (ae *AssignExpression) Expression() {}
 
 func (ce *CallExpression) TokenWord() string {
 	return ce.Token.Word

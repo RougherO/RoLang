@@ -458,6 +458,68 @@ func TestPrefixExpression(t *testing.T) {
 	}
 }
 
+func TestAssignExpression(t *testing.T) {
+	input := `x = 1; a[0] = 2;`
+
+	l := lexer.New("parser_test_assign", input)
+	p := New(l)
+
+	program := p.Parse()
+	checkErrors(t, p)
+
+	if n := len(program.Statements); n != 2 {
+		t.Fatalf("program.Statements does not contain 2 statements. got=%d", n)
+	}
+
+	exprStmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("exprStmt is not *ast.ExpressionStatement. got=%T", exprStmt)
+	}
+
+	assignId, ok := exprStmt.Expression.(*ast.AssignExpression)
+	if !ok {
+		t.Fatalf("exprStmt.Expression is not *ast.AssignExpression. got=%T",
+			exprStmt.Expression)
+	}
+
+	if !testPrimaryExpression(t, assignId.Left, "x") {
+		return
+	}
+
+	if !testPrimaryExpression(t, assignId.Right, 1) {
+		return
+	}
+
+	indexStmt, ok := program.Statements[1].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("indexStmt is not *ast.ExpressionStatement. got=%T", indexStmt)
+	}
+
+	assign, ok := indexStmt.Expression.(*ast.AssignExpression)
+	if !ok {
+		t.Fatalf("indexStmt.Expression is not *ast.AssignExpression. got=%T",
+			indexStmt.Expression)
+	}
+
+	lhs, ok := assign.Left.(*ast.IndexExpression)
+	if !ok {
+		t.Fatalf("assign.Left is not *ast.IndexExpression. got=%T",
+			assign.Left)
+	}
+
+	if !testPrimaryExpression(t, lhs.Left, "a") {
+		return
+	}
+
+	if !testPrimaryExpression(t, lhs.Index, 0) {
+		return
+	}
+
+	if !testPrimaryExpression(t, assign.Right, 2) {
+		return
+	}
+}
+
 func TestInfixExpression(t *testing.T) {
 	infixTests := []struct {
 		input    string
@@ -862,6 +924,10 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 		{
 			"add(a * b[2], b[1], 2 * [1, 2][1])",
 			"add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",
+		},
+		{
+			"x = y = z",
+			"(x = (y = z))",
 		},
 	}
 
