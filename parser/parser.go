@@ -119,6 +119,8 @@ func (p *Parser) ParseStatement() ast.Statement {
 			return p.parseExpressionStatement()
 		}
 		return p.parseFunctionStatement()
+	case token.LOOP:
+		return p.parseLoopStatement()
 	default:
 		return p.parseExpressionStatement()
 	}
@@ -193,6 +195,31 @@ func (p *Parser) parseFunctionStatement() *ast.FunctionStatement {
 		Body:       body,
 	}
 
+	return stmt
+}
+
+func (p *Parser) parseLoopStatement() ast.Statement {
+	stmt := &ast.LoopStatement{Token: p.currToken}
+	p.readToken() // consume `loop`
+
+	if !p.hasToken(token.LBRACE) {
+		cond := p.ParseExpression(NONE)
+		if cond == nil {
+			return nil
+		}
+		stmt.Condition = cond
+	}
+
+	if !p.expectToken(token.LBRACE) {
+		return nil
+	}
+
+	body := p.parseBlockStatement()
+	if body == nil {
+		return nil
+	}
+
+	stmt.Body = body
 	return stmt
 }
 

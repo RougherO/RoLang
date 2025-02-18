@@ -35,6 +35,12 @@ type (
 		Statements []Statement
 	}
 
+	LoopStatement struct {
+		Token     token.Token // `loop` keyword
+		Condition Expression
+		Body      *BlockStatement
+	}
+
 	FunctionStatement struct {
 		Token token.Token
 		Ident *Identifier
@@ -201,6 +207,28 @@ func (ls *LetStatement) Location() token.SrcLoc {
 }
 
 func (ls *LetStatement) Statement() {}
+
+func (ls *LoopStatement) TokenWord() string {
+	return ls.Token.Word
+}
+
+func (ls *LoopStatement) String() string {
+	out := "loop "
+
+	if ls.Condition != nil {
+		out += ls.Condition.String()
+	}
+
+	out += ls.Body.String()
+
+	return out
+}
+
+func (ls *LoopStatement) Location() token.SrcLoc {
+	return ls.Token.Loc
+}
+
+func (ls *LoopStatement) Statement() {}
 
 func (fs *FunctionStatement) TokenWord() string {
 	return fs.Token.Word

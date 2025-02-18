@@ -32,6 +32,7 @@ if 5 < 10 {
 "foo bar"
 [1, 2]
 {"hello": "world"}
+loop x < 1 {}
 `
 
 	tests := []struct {
@@ -120,6 +121,12 @@ if 5 < 10 {
 		{token.STRING, "hello"},
 		{token.COLON, ":"},
 		{token.STRING, "world"},
+		{token.RBRACE, "}"},
+		{token.LOOP, "loop"},
+		{token.IDENT, "x"},
+		{token.LT, "<"},
+		{token.INT, "1"},
+		{token.LBRACE, "{"},
 		{token.RBRACE, "}"},
 		{token.EOF, "eof"},
 	}

@@ -79,6 +79,40 @@ let calladd = fn (x, y) { x + y; };
 	}
 }
 
+func TestLoopStatement(t *testing.T) {
+	input := "loop x < 1 { true; }"
+
+	l := lexer.New("parser_test_loop", input)
+	p := New(l)
+
+	program := p.Parse()
+	checkErrors(t, p)
+
+	if n := len(program.Statements); n != 1 {
+		t.Fatalf("program.Statements does not contain 1 statement. got=%d", n)
+	}
+
+	stmt, ok := program.Statements[0].(*ast.LoopStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] not *ast.LoopStatement. got=%T",
+			program.Statements)
+	}
+
+	if !testInfixExpression(t, stmt.Condition, "x", "<", 1) {
+		return
+	}
+
+	body, ok := stmt.Body.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("stmt.Body.Statements[0] not *ast.ExpressionStatement. got=%T",
+			stmt.Body.Statements[0])
+	}
+
+	if !testPrimaryExpression(t, body.Expression, true) {
+		return
+	}
+}
+
 func TestFunctionStatement(t *testing.T) {
 	input := "fn add(x, y) { x + y; }"
 
