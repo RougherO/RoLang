@@ -80,9 +80,10 @@ let calladd = fn (x, y) { x + y; };
 }
 
 func TestLoopStatement(t *testing.T) {
-	input := "loop x < 1 { true; }"
+	input1 := "loop x < 1 { true; }"
+	input2 := "loop { true; }"
 
-	l := lexer.New("parser_test_loop", input)
+	l := lexer.New("parser_test_loop", input1)
 	p := New(l)
 
 	program := p.Parse()
@@ -109,6 +110,36 @@ func TestLoopStatement(t *testing.T) {
 	}
 
 	if !testPrimaryExpression(t, body.Expression, true) {
+		return
+	}
+
+	l1 := lexer.New("parser_test_loop", input2)
+	p1 := New(l1)
+
+	program1 := p1.Parse()
+	checkErrors(t, p1)
+
+	if n := len(program1.Statements); n != 1 {
+		t.Fatalf("program1.Statements does not contain 1 statement. got=%d", n)
+	}
+
+	stmt1, ok := program1.Statements[0].(*ast.LoopStatement)
+	if !ok {
+		t.Fatalf("program1.Statements[0] not *ast.LoopStatement. got=%T",
+			program1.Statements)
+	}
+
+	if stmt1.Condition != nil {
+		t.Fatalf("stmt1.Condition is not nil")
+	}
+
+	body1, ok := stmt1.Body.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("stmt1.Body.Statements[0] not *ast.ExpressionStatement. got=%T",
+			stmt1.Body.Statements[0])
+	}
+
+	if !testPrimaryExpression(t, body1.Expression, true) {
 		return
 	}
 }

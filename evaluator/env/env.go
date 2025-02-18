@@ -41,7 +41,7 @@ func (e *Environment) Assign(name string, value any) bool {
 	}
 
 	if e.outer != nil {
-		return e.Assign(name, value)
+		return e.outer.Assign(name, value)
 	}
 
 	return false

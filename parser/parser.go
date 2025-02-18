@@ -6,7 +6,6 @@ import (
 	"RoLang/token"
 
 	"fmt"
-	"reflect"
 	"strconv"
 )
 
@@ -93,7 +92,7 @@ func (p *Parser) Parse() *ast.Program {
 	// Read until end of file
 	for !p.hasToken(token.EOF) {
 		stmt := p.ParseStatement()
-		if reflect.ValueOf(stmt).IsNil() {
+		if stmt == nil {
 			return nil
 		}
 		program.Statements = append(program.Statements, stmt)
@@ -200,9 +199,9 @@ func (p *Parser) parseFunctionStatement() *ast.FunctionStatement {
 
 func (p *Parser) parseLoopStatement() ast.Statement {
 	stmt := &ast.LoopStatement{Token: p.currToken}
-	p.readToken() // consume `loop`
 
-	if !p.hasToken(token.LBRACE) {
+	if !p.peekToken(token.LBRACE) {
+		p.readToken() // consume `loop`
 		cond := p.ParseExpression(NONE)
 		if cond == nil {
 			return nil

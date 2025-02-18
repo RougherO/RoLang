@@ -96,6 +96,8 @@ func evalStatement(stmt ast.Statement) {
 		defer ctxt.RestoreEnv()
 	case *ast.ExpressionStatement:
 		evalExpression(s.Expression)
+	case *ast.LoopStatement:
+		evalLoopStatement(s)
 	}
 }
 
@@ -104,6 +106,17 @@ func evalFunctionStatement(s *ast.FunctionStatement) {
 	init := evalExpression(s.Value)
 	if !ctxt.Env.Set(name, init) {
 		panic(fmt.Errorf("variable %s already exists in current scope", name))
+	}
+}
+
+func evalLoopStatement(s *ast.LoopStatement) {
+	for {
+		cond := s.Condition == nil || isTruthy(evalExpression(s.Condition))
+		if !cond {
+			break
+		}
+
+		evalStatement(s.Body)
 	}
 }
 

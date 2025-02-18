@@ -18,6 +18,10 @@ type expectType struct {
 	value any
 }
 
+func TestLoopStatement(t *testing.T) {
+	// TODO need tests
+}
+
 func TestBlockStatement(t *testing.T) {
 	// TODO need tests
 }
