@@ -55,6 +55,8 @@ func New(in io.Reader, out, err io.Writer) *Context {
 					out += strconv.FormatFloat(v, 'f', -1, 64)
 				case string:
 					out += v
+				case bool:
+					out += strconv.FormatBool(v)
 				case *objects.MapObject:
 					out += "{"
 					i := 0
