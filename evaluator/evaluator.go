@@ -428,6 +428,27 @@ func evalAddOperator(left, right any) any {
 		default:
 			panic(fmt.Errorf("addition not supported for %s and %s", typeStr(l), typeStr(r)))
 		}
+	case *objects.ArrayObject:
+		switch r := right.(type) {
+		case *objects.ArrayObject:
+			return &objects.ArrayObject{
+				List: slices.Concat(l.List, r.List),
+			}
+		default:
+			panic(fmt.Errorf("addition not supported for %s and %s", typeStr(l), typeStr(r)))
+		}
+	case *objects.MapObject:
+		switch r := right.(type) {
+		case *objects.MapObject:
+			mapObj := &objects.MapObject{
+				Map: make(map[any]any),
+			}
+			maps.Copy(mapObj.Map, l.Map)
+			maps.Copy(mapObj.Map, r.Map)
+			return mapObj
+		default:
+			panic(fmt.Errorf("addition not supported for %s and %s", typeStr(l), typeStr(r)))
+		}
 	default:
 		panic(fmt.Errorf("addition not supported for %s", typeStr(l)))
 	}
