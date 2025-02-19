@@ -193,6 +193,31 @@ func New(in io.Reader, out, err io.Writer) *Context {
 
 			return out
 		},
+		"insert": func(args ...any) any {
+			if len(args) != 3 {
+				panic(fmt.Errorf("`insert` expects 3 arguments, got=%d", len(args)))
+			}
+			switch v := args[0].(type) {
+			case *objects.ArrayObject:
+				index, ok := args[1].(int64)
+				if !ok {
+					panic(fmt.Errorf("`index` expects integer index for second argument, got=%s",
+						c.builtins["str"](index)))
+				}
+				if index > int64(len(v.List)) || index < 0 {
+					panic(fmt.Errorf("index out of range [%d]", index))
+				}
+				v.List = slices.Insert(v.List, int(index), args[2])
+			case *objects.MapObject:
+				key := args[1]
+				val := args[2]
+				v.Map[key] = val
+			default:
+				panic(fmt.Errorf("`insert` expects an array or map type, got=%s",
+					c.builtins["type"](v)))
+			}
+			return nil
+		},
 		"erase": func(args ...any) any {
 			if len(args) != 2 {
 				panic(fmt.Errorf("`erase` expects 2 arguments, got=%d", len(args)))
@@ -201,7 +226,8 @@ func New(in io.Reader, out, err io.Writer) *Context {
 			case *objects.ArrayObject:
 				index, ok := args[1].(int64)
 				if !ok {
-					panic(fmt.Errorf("expect integer index, got=%s", c.builtins["type"](index)))
+					panic(fmt.Errorf("expect integer index, got=%s",
+						c.builtins["type"](index)))
 				}
 				e := v.Pop(int(index))
 				return e // return the erased element
@@ -211,7 +237,8 @@ func New(in io.Reader, out, err io.Writer) *Context {
 				delete(v.Map, key)
 				return val // return value of erased key
 			default:
-				panic(fmt.Errorf("`erase` expects an array or map type, got=%s", c.builtins["type"](args[0])))
+				panic(fmt.Errorf("`erase` expects an array or map type, got=%s",
+					c.builtins["type"](args[0])))
 			}
 		},
 		"clone": func(args ...any) any {
@@ -229,7 +256,8 @@ func New(in io.Reader, out, err io.Writer) *Context {
 				}
 			}
 
-			panic(fmt.Errorf("`clone` expects an array or map type, got=%s", c.builtins["type"](args[0])))
+			panic(fmt.Errorf("`clone` expects an array or map type, got=%s",
+				c.builtins["type"](args[0])))
 		},
 		"clear": func(args ...any) any {
 			if len(args) != 1 {
@@ -242,7 +270,8 @@ func New(in io.Reader, out, err io.Writer) *Context {
 			case *objects.MapObject:
 				clear(v.Map)
 			default:
-				panic(fmt.Errorf("`clear` expects an array or map type, got=%s", c.builtins["type"](args[0])))
+				panic(fmt.Errorf("`clear` expects an array or map type, got=%s",
+					c.builtins["type"](args[0])))
 			}
 
 			return nil
