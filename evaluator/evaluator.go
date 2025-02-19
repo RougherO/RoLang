@@ -526,6 +526,13 @@ func evalLtOperator(left, right any) bool {
 		default:
 			panic(fmt.Errorf("cannot compare types %s and %s", typeStr(l), typeStr(r)))
 		}
+	case string:
+		switch r := right.(type) {
+		case string:
+			return l < r
+		default:
+			panic(fmt.Errorf("cannot compare types %s and %s", typeStr(l), typeStr(r)))
+		}
 	default:
 		panic(fmt.Errorf("comparison not supported for %s", typeStr(l)))
 	}
@@ -558,6 +565,13 @@ func evalEqOperator(left, right any) bool {
 	case bool:
 		switch r := right.(type) {
 		case bool:
+			return l == r
+		default:
+			return false
+		}
+	case string:
+		switch r := right.(type) {
+		case string:
 			return l == r
 		default:
 			return false
