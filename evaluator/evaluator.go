@@ -4,6 +4,8 @@ import (
 	"RoLang/ast"
 	"RoLang/evaluator/context"
 	"RoLang/evaluator/objects"
+	"maps"
+	"slices"
 
 	"fmt"
 	"io"
@@ -573,6 +575,20 @@ func evalEqOperator(left, right any) bool {
 		switch r := right.(type) {
 		case string:
 			return l == r
+		default:
+			return false
+		}
+	case *objects.ArrayObject:
+		switch r := right.(type) {
+		case *objects.ArrayObject:
+			return slices.Equal(l.List, r.List)
+		default:
+			return false
+		}
+	case *objects.MapObject:
+		switch r := right.(type) {
+		case *objects.MapObject:
+			return maps.Equal(l.Map, r.Map)
 		default:
 			return false
 		}
