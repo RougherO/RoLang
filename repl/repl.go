@@ -6,18 +6,20 @@ import (
 	"RoLang/parser"
 
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 )
 
 const prompt = "|> "
-const message = `RoLang v0.2 Tree-Walk Interpreter`
+const message = `RoLang v0.3 Tree-Walk Interpreter`
 
-func Start(in io.Reader, out io.Writer, err io.Writer) {
+func Start() {
 	fmt.Println(message)
-	scanner := bufio.NewScanner(in)
-	evaluator.Init(in, out, err)
+	scanner := bufio.NewScanner(os.Stdin)
+	e := evaluator.New()
 	for {
 		fmt.Print(prompt)
 
@@ -34,33 +36,19 @@ func Start(in io.Reader, out io.Writer, err io.Writer) {
 
 		l := lexer.New("repl", line)
 		p := parser.New(l)
-
-		// var node ast.Node
-		// // lines ending with semicolon are statements
-		// if c := line[size-1]; c == ';' {
-		// 	node = p.ParseStatement()
-		// } else {
-		// 	node = p.ParseExpression(parser.NONE)
-		// }
 		program := p.Parse()
 
 		if len(p.Errors()) != 0 {
-			io.WriteString(err, strings.Join(p.Errors(), "\n"))
-			io.WriteString(err, "\n")
-			io.WriteString(out, "null\n")
+			io.WriteString(os.Stderr, strings.Join(p.Errors(), "\n"))
+			io.WriteString(os.Stderr, "\n")
+			io.WriteString(os.Stdout, "null\n")
 			continue
 		}
 
-		evaluator.Evaluate(program)
-
-		// if result != nil {
-		// 	io.WriteString(out, fmt.Sprintf("%v", result))
-		// 	io.WriteString(out, "\n")
-		// } else if len(errors) != 0 {
-		// 	io.WriteString(err, evaluator.Errors())
-		// 	io.WriteString(err, "\n")
-		// 	io.WriteString(out, "null\n")
-		// 	evaluator.ClearErr()
-		// }
+		e.Evaluate(program)
+		if len(e.Errors) != 0 {
+			fmt.Println(errors.Join(e.Errors...))
+			e.Errors = e.Errors[:0]
+		}
 	}
 }

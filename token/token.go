@@ -13,6 +13,7 @@ const (
 	STRING // "hello" "world"
 
 	// Operators
+	DOT    // "."
 	ASSIGN // "="
 	PLUS   // "+"
 	MINUS  // "-"
@@ -59,6 +60,7 @@ var TokenString = []string{
 	IDENT:  "identifier",
 	INT:    "integer",
 	FLOAT:  "float",
+	DOT:    ".",
 	ASSIGN: "=",
 	PLUS:   "+",
 	MINUS:  "-",

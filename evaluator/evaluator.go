@@ -2,50 +2,93 @@ package evaluator
 
 import (
 	"RoLang/ast"
-	"RoLang/evaluator/context"
+	"RoLang/evaluator/env"
 	"RoLang/evaluator/objects"
-	"maps"
-	"slices"
+	"RoLang/stdlib"
+	"RoLang/stdlib/builtin"
+	"RoLang/stdlib/common"
+	"RoLang/stdlib/strings"
 
 	"fmt"
-	"io"
+	"maps"
 	"os"
+	"slices"
 )
 
-// global context variable to maintain
-// evaluator states
-var ctxt *context.Context
+type Evaluator struct {
+	Errors []error
 
-func Init(in io.Reader, out, err io.Writer) {
-	ctxt = context.New(in, out, err)
+	env      *env.Environment
+	envStack []*env.Environment
+	stdlib   *stdlib.StdLib
 }
 
-func recoveryHandler() {
+func New() *Evaluator {
+	return &Evaluator{
+		// context: *context.New(in, out),
+		env:    env.New(nil),
+		stdlib: stdlib.New(),
+	}
+}
+
+func (e *Evaluator) Evaluate(program *ast.Program) {
+	defer e.recoveryHandler()
+	err := e.evalStatements(program.Statements)
+	if err != nil {
+		e.addError(err)
+	}
+}
+
+// for block scopes it should just enclose the current environment
+func (e *Evaluator) createEnv() {
+	e.env = env.New(e.env)
+}
+
+// restores the environment set with `CreateEnv` function
+// by just 'moving up' the environment chain
+func (e *Evaluator) restoreEnv() {
+	e.env = e.env.Outer()
+}
+
+// for function calls it should set up a new environment
+// with by enclosing the one provided in parameter
+func (e *Evaluator) setEnv(environment *env.Environment) {
+	e.envStack = append(e.envStack, e.env)
+	e.env = env.New(environment)
+}
+
+// resets the environment set with `SetEnv“ function
+func (e *Evaluator) resetEnv() {
+	e.env = e.envStack[len(e.envStack)-1]
+	e.envStack = e.envStack[:len(e.envStack)-1]
+}
+
+// recovers from any kind of error that may have
+// trickled down to the top most execution stack
+// this handler is a best effort handler for handling
+// any possible error that couldn't be handled in
+// intermediate steps
+func (e *Evaluator) recoveryHandler() {
 	err := recover()
 
 	if err != nil {
-		switch e := err.(type) {
+		switch v := err.(type) {
 		case objects.ReturnObject:
-			switch e := e.Value.(type) {
+			switch v := v.Value.(type) {
 			case int64:
-				os.Exit(int(e))
+				os.Exit(int(v))
 			case nil:
 				os.Exit(0)
 			default:
-				io.WriteString(ctxt.Err, "can only return integer exit codes at top level\n")
+				e.addError(fmt.Errorf("can only return integer exit codes at top level"))
 			}
 		case error:
-			io.WriteString(ctxt.Err, fmt.Sprintf("runtime error:%v", e)+"\n")
+			e.addError(fmt.Errorf("runtime error:%v", e))
 		}
 	}
 }
 
-func Evaluate(program *ast.Program) {
-	defer recoveryHandler()
-	evalStatements(program.Statements)
-}
-
-func exprErrorHandler(expr ast.Expression) {
+func (e *Evaluator) exprErrorHandler(expr ast.Expression) {
 	err := recover()
 
 	if err != nil {
@@ -53,12 +96,12 @@ func exprErrorHandler(expr ast.Expression) {
 		case objects.ReturnObject:
 			panic(err)
 		case error:
-			panic(fmt.Errorf("\n%s %s", expr.Location(), err))
+			e.addError(fmt.Errorf("%s %s", expr.Location(), err))
 		}
 	}
 }
 
-func stmtErrorHandler(stmt ast.Statement) {
+func (e *Evaluator) stmtErrorHandler(stmt ast.Statement) {
 	err := recover()
 
 	if err != nil {
@@ -66,314 +109,434 @@ func stmtErrorHandler(stmt ast.Statement) {
 		case objects.ReturnObject:
 			panic(err)
 		case error:
-			panic(fmt.Errorf("\n%s %s", stmt.Location(), err))
+			e.addError(fmt.Errorf("%s %s", stmt.Location(), err))
 		}
 	}
 }
 
-func evalStatements(stmts []ast.Statement) {
+func (e *Evaluator) evalStatements(stmts []ast.Statement) error {
 	for _, stmt := range stmts {
-		evalStatement(stmt)
+		err := e.evalStatement(stmt)
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
-func evalStatement(stmt ast.Statement) {
+func (e *Evaluator) evalStatement(statement ast.Statement) error {
 	// error handler for statement panics
 	// used for adding source location to the error
-	defer stmtErrorHandler(stmt)
+	defer e.stmtErrorHandler(statement)
 
-	switch s := stmt.(type) {
+	switch stmt := statement.(type) {
 	case *ast.LetStatement:
-		evalLetStatement(s)
+		return e.evalLetStatement(stmt)
 	case *ast.FunctionStatement:
-		evalFunctionStatement(s)
+		return e.evalFunctionStatement(stmt)
 	case *ast.ReturnStatement:
-		evalReturnStatement(s)
+		return e.evalReturnStatement(stmt)
 	case *ast.IfStatement:
-		evalIfStatement(s)
+		return e.evalIfStatement(stmt)
 	case *ast.BlockStatement:
-		ctxt.CreateEnv()
-		evalStatements(s.Statements)
+		e.createEnv()
+		defer e.restoreEnv()
+		return e.evalStatements(stmt.Statements)
 		// should pop out the current environment no matter what
-		defer ctxt.RestoreEnv()
 	case *ast.ExpressionStatement:
-		evalExpression(s.Expression)
+		_, err := e.evalExpression(stmt.Expression)
+		return err
 	case *ast.LoopStatement:
-		evalLoopStatement(s)
+		return e.evalLoopStatement(stmt)
 	}
+
+	return nil
 }
 
-func evalFunctionStatement(s *ast.FunctionStatement) {
-	name := s.Ident.Value
-	init := evalExpression(s.Value)
-	if !ctxt.Env.Set(name, init) {
-		panic(fmt.Errorf("variable %s already exists in current scope", name))
+func (e *Evaluator) evalFunctionStatement(function *ast.FunctionStatement) error {
+	name := function.Ident.Value
+	init, err := e.evalExpression(function.Value)
+	if err != nil {
+		return err
 	}
+	if !e.env.Set(name, init) {
+		return fmt.Errorf("variable %s already exists in current scope", name)
+	}
+
+	return nil
 }
 
-func evalLoopStatement(s *ast.LoopStatement) {
+func (e *Evaluator) evalLoopStatement(loop *ast.LoopStatement) error {
 	for {
-		cond := s.Condition == nil || isTruthy(evalExpression(s.Condition))
+		// should continue looping if there is no condition
+		// or check the condition repeatedly
+		expr, err := e.evalExpression(loop.Condition)
+		if err != nil {
+			return err
+		}
+
+		cond := loop.Condition == nil || isTruthy(expr)
 		if !cond {
 			break
 		}
 
-		evalStatement(s.Body)
+		err = e.evalStatement(loop.Body)
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
-func evalLetStatement(s *ast.LetStatement) {
-	name := s.Ident.Value
-	init := evalExpression(s.InitValue)
-	if !ctxt.Env.Set(name, init) {
-		panic(fmt.Errorf("variable %s already exists in current scope", name))
+func (e *Evaluator) evalLetStatement(let *ast.LetStatement) error {
+	name := let.Ident.Value
+	init, err := e.evalExpression(let.InitValue)
+	if err != nil {
+		return err
 	}
+	if !e.env.Set(name, init) {
+		return fmt.Errorf("variable %s already exists in current scope", name)
+	}
+
+	return nil
 }
 
-func evalReturnStatement(s *ast.ReturnStatement) {
+func (e *Evaluator) evalReturnStatement(ret *ast.ReturnStatement) error {
 	var retValue any
-	if s.ReturnValue != nil {
-		retValue = evalExpression(s.ReturnValue)
+	if ret.ReturnValue != nil {
+		expr, err := e.evalExpression(ret.ReturnValue)
+		if err != nil {
+			return err
+		}
+		retValue = expr
 	}
+
 	panic(objects.ReturnObject{Value: retValue})
 }
 
-func evalIfStatement(s *ast.IfStatement) {
-	condition := evalExpression(s.Condition)
+func (e *Evaluator) evalIfStatement(ifStmt *ast.IfStatement) error {
+	condition, err := e.evalExpression(ifStmt.Condition)
+	if err != nil {
+		return err
+	}
 
 	if isTruthy(condition) {
-		evalStatement(s.Then)
-	} else if s.Else != nil {
-		evalStatement(s.Else)
+		err := e.evalStatement(ifStmt.Then)
+		if err != nil {
+			return err
+		}
+	} else if ifStmt.Else != nil {
+		err := e.evalStatement(ifStmt.Else)
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
-func evalExpression(expr ast.Expression) any {
-	defer exprErrorHandler(expr)
+func (e *Evaluator) evalExpression(expression ast.Expression) (any, error) {
+	defer e.exprErrorHandler(expression)
 
-	switch e := expr.(type) {
+	switch expr := expression.(type) {
 	case *ast.InfixExpression:
-		return evalInfixExpression(e)
+		return e.evalInfixExpression(expr)
 	case *ast.PrefixExpression:
-		return evalPrefixExpression(e)
+		return e.evalPrefixExpression(expr)
 	case *ast.Identifier:
-		return evalIdentifier(e)
+		return e.evalIdentifier(expr)
 	case *ast.AssignExpression:
-		return evalAssignExpression(e)
+		return e.evalAssignExpression(expr)
 	case *ast.ArrayLiteral:
-		return evalArrayLiteral(e)
+		return e.evalArrayLiteral(expr)
 	case *ast.MapLiteral:
-		return evalMapLiteral(e)
+		return e.evalMapLiteral(expr)
 	case *ast.StringLiteral:
-		return e.Value
+		return expr.Value, nil
 	case *ast.BoolLiteral:
-		return e.Value
+		return expr.Value, nil
 	case *ast.IntegerLiteral:
-		return e.Value
+		return expr.Value, nil
 	case *ast.FloatLiteral:
-		return e.Value
+		return expr.Value, nil
 	case *ast.FunctionLiteral:
-		return evalFunctionLiteral(e)
+		return e.evalFunctionLiteral(expr)
 	case *ast.CallExpression:
-		return evalCallExpression(e)
+		return e.evalCallExpression(expr)
 	case *ast.IndexExpression:
-		return evalIndexExpression(e)
+		return e.evalIndexExpression(expr)
 	default:
-		panic(fmt.Errorf("unknown expression type %T", expr))
+		panic(fmt.Errorf("unknown expression type %T", expression))
 	}
 }
 
-func evalArrayLiteral(e *ast.ArrayLiteral) *objects.ArrayObject {
+func (e *Evaluator) evalArrayLiteral(expr *ast.ArrayLiteral) (*objects.ArrayObject, error) {
 	arr := &objects.ArrayObject{}
 
-	for _, elem := range e.Elements {
-		expr := evalExpression(elem)
+	for _, elem := range expr.Elements {
+		expr, err := e.evalExpression(elem)
+		if err != nil {
+			return nil, err
+		}
 		arr.List = append(arr.List, expr)
 	}
 
-	return arr
+	return arr, nil
 }
 
-func evalMapLiteral(e *ast.MapLiteral) *objects.MapObject {
+func (e *Evaluator) evalMapLiteral(expr *ast.MapLiteral) (*objects.MapObject, error) {
 	mp := &objects.MapObject{
 		Map: make(map[any]any),
 	}
 
-	for _, elem := range e.Elements {
-		key := evalExpression(elem.Key)
-		val := evalExpression(elem.Value)
+	for _, elem := range expr.Elements {
+		key, err := e.evalExpression(elem.Key)
+		if err != nil {
+			return nil, err
+		}
+		val, err := e.evalExpression(elem.Value)
+		if err != nil {
+			return nil, err
+		}
 		mp.Map[key] = val
 	}
 
-	return mp
+	return mp, nil
 }
 
-func evalIndexExpression(e *ast.IndexExpression) any {
-	left := evalExpression(e.Left)
+func (e *Evaluator) evalIndexExpression(expr *ast.IndexExpression) (any, error) {
+	left, err := e.evalExpression(expr.Left)
+	if err != nil {
+		return nil, err
+	}
+
 	switch v := left.(type) {
 	case *objects.ArrayObject:
-		right := evalExpression(e.Index)
+		right, err := e.evalExpression(expr.Index)
+		if err != nil {
+			return nil, err
+		}
 		index, ok := right.(int64)
 		if !ok {
-			panic(fmt.Errorf("expect integer index, got=%s", typeStr(index)))
+			return nil, fmt.Errorf("expect integer index, got=%s", e.typeStr(index))
 		}
 
 		if index >= int64(len(v.List)) || index < 0 {
-			panic(fmt.Errorf("index out of range [%d]", index))
+			return nil, fmt.Errorf("index out of range [%d]", index)
 		}
 
-		return v.List[index]
+		return v.List[index], nil
 	case *objects.MapObject:
-		right := evalExpression(e.Index)
+		right, err := e.evalExpression(expr.Index)
+		if err != nil {
+			return nil, err
+		}
 		switch right.(type) {
 		case int64:
-			return v.Map[right]
+			return v.Map[right], nil
 		case float64:
-			return v.Map[right]
+			return v.Map[right], nil
 		case string:
-			return v.Map[right]
+			return v.Map[right], nil
 		case bool:
-			return v.Map[right]
+			return v.Map[right], nil
 		default:
-			panic(fmt.Errorf("only int, float, string and bool is allowed as key. got=%s",
-				typeStr(v)))
+			return nil, fmt.Errorf("only int, float, string and bool is allowed as key. got=%s",
+				e.typeStr(v))
 		}
 	}
-	panic(fmt.Errorf("cannot index on type %s", typeStr(left)))
+
+	return nil, fmt.Errorf("cannot index on type %s", e.typeStr(left))
 }
 
-func evalCallExpression(e *ast.CallExpression) any {
-	value := evalExpression(e.Callee)
-	if value == nil {
-		// trying to call on a null object
-		panic(fmt.Errorf("cannot function call on null objects"))
+func (e *Evaluator) evalCallExpression(expr *ast.CallExpression) (any, error) {
+	value, err := e.evalExpression(expr.Callee)
+	if err != nil {
+		return nil, err
+	}
+	// if value == nil {
+	// 	// trying to call on a null object
+	// 	return fmt.Errorf("cannot function call on null objects")
+	// }
+
+	args, err := e.evalCallArgs(expr.Arguments)
+	if err != nil {
+		return nil, err
 	}
 
-	args := evalCallArgs(e.Arguments)
-	return callFunction(value, args)
+	return e.callFunction(value, args)
 }
 
-func evalCallArgs(args []ast.Expression) []any {
-	result := make([]any, 0)
-	for _, e := range args {
-		arg := evalExpression(e)
+func (e *Evaluator) evalCallArgs(args []ast.Expression) ([]any, error) {
+	result := []any{}
+	for _, expr := range args {
+		arg, err := e.evalExpression(expr)
+		if err != nil {
+			return nil, err
+		}
 		result = append(result, arg)
 	}
 
-	return result
+	return result, nil
 }
 
-func callFunction(fn any, args []any) (retValue any) {
-	switch obj := fn.(type) {
-	case objects.FuncObject:
+func (e *Evaluator) callFunction(function any, args []any) (retValue any, errValue error) {
+	switch obj := function.(type) {
+	case *objects.FuncObject:
 		returnRetriever := func() {
-			ctxt.ResetEnv()
+			e.resetEnv()
 
 			err := recover()
 			switch val := err.(type) {
 			case objects.ReturnObject:
 				retValue = val.Value // is a return value
-			default:
-				panic(retValue) // some runtime error
+			case error:
+				errValue = val
 			}
 		}
 		defer returnRetriever() // set return value or propagate error
 
 		// create new scope with the function's
-		ctxt.SetEnv(obj.Env)
+		e.setEnv(obj.Env)
 
-		function := obj.Fn
+		function := obj.Function
 		if len(args) != len(function.Parameters) {
-			panic(fmt.Errorf("incorrect no of arguments. got=%d, expect=%d",
-				len(args), len(function.Parameters)))
+			return nil, fmt.Errorf("incorrect no of arguments. got=%d, expect=%d",
+				len(args), len(function.Parameters))
 		}
 
 		for i, param := range function.Parameters {
-			ctxt.Env.Set(param.Value, args[i])
+			if !e.env.Set(param.Value, args[i]) {
+				return nil, fmt.Errorf("redeclaration of variable %s", param.Value)
+			}
 		}
 
-		evalStatements(function.Body.Statements)
+		err := e.evalStatements(function.Body.Statements)
+		if err != nil {
+			return nil, err
+		}
 		// reaching here means function does not return any value
 		// in one of the control flow paths
-		panic(objects.ReturnObject{Value: nil})
-	case context.BuiltIn:
+		return nil, nil
+	case common.Sanitizer:
 		return obj(args...)
 	default:
-		panic(fmt.Errorf("not a callable %s", typeStr(fn)))
+		return nil, fmt.Errorf("not a callable %s", e.typeStr(function))
 	}
 }
 
-func evalFunctionLiteral(e *ast.FunctionLiteral) objects.FuncObject {
-	return objects.FuncObject{
-		Env: ctxt.Env,
-		Fn:  e,
-	}
+func (e *Evaluator) evalFunctionLiteral(expr *ast.FunctionLiteral) (*objects.FuncObject, error) {
+	return &objects.FuncObject{
+		Env:      e.env,
+		Function: expr,
+	}, nil
 }
 
-func evalIdentifier(e *ast.Identifier) any {
-	if value, ok := ctxt.Env.Get(e.Value); ok {
-		return value
+func (e *Evaluator) evalIdentifier(expr *ast.Identifier) (any, error) {
+	if value, ok := e.env.Get(expr.Value); ok {
+		return value, nil
 	}
-	if value, ok := ctxt.GetBuiltIn(e.Value); ok {
-		return value
+	if value, err := e.stdlib.GetModuleDispatcher("builtin", expr.Value); err == nil {
+		return value, nil
 	}
 
-	panic(fmt.Errorf("variable not found: %s", e.Value))
+	return nil, fmt.Errorf("variable not found: %s", expr.Value)
 }
 
-func evalInfixExpression(e *ast.InfixExpression) any {
-	left := evalExpression(e.Left)
-	right := evalExpression(e.Right)
-	switch e.Operator {
+func (e *Evaluator) evalInfixExpression(expr *ast.InfixExpression) (any, error) {
+	if expr.Operator == "." {
+		return e.evalModuleOperator(expr.Left, expr.Right)
+	}
+
+	left, err := e.evalExpression(expr.Left)
+	if err != nil {
+		return nil, err
+	}
+
+	right, err := e.evalExpression(expr.Right)
+	if err != nil {
+		return nil, err
+	}
+
+	switch expr.Operator {
 	case "+":
-		return evalAddOperator(left, right)
+		return e.evalAddOperator(left, right)
 	case "-":
-		return evalSubOperator(left, right)
+		return e.evalSubOperator(left, right)
 	case "*":
-		return evalMulOperator(left, right)
+		return e.evalMulOperator(left, right)
 	case "/":
-		return evalDivOperator(left, right)
+		return e.evalDivOperator(left, right)
 	case "<":
-		return evalLtOperator(left, right)
+		return e.evalLtOperator(left, right)
 	case ">":
-		return evalGtOperator(left, right)
+		return e.evalGtOperator(left, right)
 	case "<=":
-		return !evalGtOperator(left, right)
+		expr, err := e.evalGtOperator(left, right)
+		if err != nil {
+			return nil, err
+		}
+		return !expr.(bool), nil
 	case ">=":
-		return !evalLtOperator(left, right)
+		expr, err := e.evalLtOperator(left, right)
+		if err != nil {
+			return nil, err
+		}
+		return !expr.(bool), nil
 	case "==":
-		return evalEqOperator(left, right)
+		return e.evalEqOperator(left, right)
 	case "!=":
-		return !evalEqOperator(left, right)
+		expr, err := e.evalEqOperator(left, right)
+		if err != nil {
+			return nil, err
+		}
+		return !expr.(bool), nil
 	default:
-		panic(fmt.Errorf("unknown operator %s", e.Operator))
+		return nil, fmt.Errorf("unknown operator %s", expr.Operator)
 	}
 }
 
-func evalAssignExpression(expr *ast.AssignExpression) any {
-	right := evalExpression(expr.Right)
+func (e *Evaluator) evalAssignExpression(expr *ast.AssignExpression) (any, error) {
+	right, err := e.evalExpression(expr.Right)
+	if err != nil {
+		return nil, err
+	}
 
 	switch left := expr.Left.(type) {
 	case *ast.Identifier:
-		if !ctxt.Env.Assign(left.Value, right) {
-			panic(fmt.Errorf("variable %q does not exist in current scope", left.Value))
+		if !e.env.Assign(left.Value, right) {
+			return nil, fmt.Errorf("variable %q does not exist in current scope", left.Value)
 		}
 	case *ast.IndexExpression:
-		l := evalExpression(left.Left)
+		l, err := e.evalExpression(left.Left)
+		if err != nil {
+			return nil, err
+		}
 		switch v := l.(type) {
 		case *objects.ArrayObject:
-			index, ok := evalExpression(left.Index).(int64)
+			indexExpr, err := e.evalExpression(left.Index)
+			if err != nil {
+				return nil, err
+			}
+
+			index, ok := indexExpr.(int64)
 			if !ok {
-				panic(fmt.Errorf("expect integer index, got=%s", typeStr(index)))
+				return nil, fmt.Errorf("expect integer index, got=%s", e.typeStr(index))
 			}
 
 			if index >= int64(len(v.List)) || index < 0 {
-				panic(fmt.Errorf("index out of range [%d]", index))
+				return nil, fmt.Errorf("index out of range [%d]", index)
 			}
 
 			v.List[index] = right
 		case *objects.MapObject:
-			index := evalExpression(left.Index)
+			index, err := e.evalExpression(left.Index)
+			if err != nil {
+				return nil, err
+			}
+
 			switch index.(type) {
 			case int64:
 				v.Map[index] = right
@@ -384,58 +547,72 @@ func evalAssignExpression(expr *ast.AssignExpression) any {
 			case bool:
 				v.Map[index] = right
 			default:
-				panic(fmt.Errorf("only int, float, string and bool is allowed as key. got=%s",
-					typeStr(v)))
+				return nil, fmt.Errorf("only int, float, string and bool is allowed as key. got=%s",
+					e.typeStr(v))
 			}
 		}
 	}
 
-	return right
+	return right, nil
 }
 
-func evalAddOperator(left, right any) any {
+func (e *Evaluator) evalModuleOperator(left, right any) (any, error) {
+	switch l := left.(type) {
+	case *ast.Identifier:
+		switch r := right.(type) {
+		case *ast.Identifier:
+			return e.stdlib.GetModuleDispatcher(l.Value, r.Value)
+		default:
+			return nil, fmt.Errorf("expect identifier after dot operator found %s", e.valueStr(r))
+		}
+	default:
+		return nil, fmt.Errorf("cannot use dot operator with %s", e.typeStr(l))
+	}
+}
+
+func (e *Evaluator) evalAddOperator(left, right any) (any, error) {
 	switch l := left.(type) {
 	case int64:
 		switch r := right.(type) {
 		case int64:
-			return l + r
+			return l + r, nil
 		case float64:
-			return float64(l) + r
+			return float64(l) + r, nil
 		case string:
-			return valueStr(l) + valueStr(r)
+			return e.valueStr(l) + e.valueStr(r), nil
 		default:
-			panic(fmt.Errorf("addition not supported for %s and %s", typeStr(l), typeStr(r)))
+			return nil, fmt.Errorf("addition not supported for %s and %s", e.typeStr(l), e.typeStr(r))
 		}
 	case float64:
 		switch r := right.(type) {
 		case int64:
-			return l + float64(r)
+			return l + float64(r), nil
 		case float64:
-			return l + r
+			return l + r, nil
 		case string:
-			return valueStr(l) + valueStr(r)
+			return e.valueStr(l) + e.valueStr(r), nil
 		default:
-			panic(fmt.Errorf("addition not supported for %s and %s", typeStr(l), typeStr(r)))
+			return nil, fmt.Errorf("addition not supported for %s and %s", e.typeStr(l), e.typeStr(r))
 		}
 	case string:
 		switch r := right.(type) {
 		case string:
-			return valueStr(l) + valueStr(r)
+			return e.valueStr(l) + e.valueStr(r), nil
 		case int64:
-			return valueStr(l) + valueStr(r)
+			return e.valueStr(l) + e.valueStr(r), nil
 		case float64:
-			return valueStr(l) + valueStr(r)
+			return e.valueStr(l) + e.valueStr(r), nil
 		default:
-			panic(fmt.Errorf("addition not supported for %s and %s", typeStr(l), typeStr(r)))
+			return nil, fmt.Errorf("addition not supported for %s and %s", e.typeStr(l), e.typeStr(r))
 		}
 	case *objects.ArrayObject:
 		switch r := right.(type) {
 		case *objects.ArrayObject:
 			return &objects.ArrayObject{
 				List: slices.Concat(l.List, r.List),
-			}
+			}, nil
 		default:
-			panic(fmt.Errorf("addition not supported for %s and %s", typeStr(l), typeStr(r)))
+			return nil, fmt.Errorf("addition not supported for %s and %s", e.typeStr(l), e.typeStr(r))
 		}
 	case *objects.MapObject:
 		switch r := right.(type) {
@@ -445,218 +622,224 @@ func evalAddOperator(left, right any) any {
 			}
 			maps.Copy(mapObj.Map, l.Map)
 			maps.Copy(mapObj.Map, r.Map)
-			return mapObj
+			return mapObj, nil
 		default:
-			panic(fmt.Errorf("addition not supported for %s and %s", typeStr(l), typeStr(r)))
+			return nil, fmt.Errorf("addition not supported for %s and %s", e.typeStr(l), e.typeStr(r))
 		}
 	default:
-		panic(fmt.Errorf("addition not supported for %s", typeStr(l)))
+		return nil, fmt.Errorf("addition not supported for %s", e.typeStr(l))
 	}
 }
 
-func evalSubOperator(left, right any) any {
+func (e *Evaluator) evalSubOperator(left, right any) (any, error) {
 	switch l := left.(type) {
 	case int64:
 		switch r := right.(type) {
 		case int64:
-			return l - r
+			return l - r, nil
 		case float64:
-			return float64(l) - r
+			return float64(l) - r, nil
 		default:
-			panic(fmt.Errorf("subtraction not supported for %s and %s", typeStr(l), typeStr(r)))
+			return nil, fmt.Errorf("subtraction not supported for %s and %s", e.typeStr(l), e.typeStr(r))
 		}
 	case float64:
 		switch r := right.(type) {
 		case int64:
-			return l - float64(r)
+			return l - float64(r), nil
 		case float64:
-			return l - r
+			return l - r, nil
 		default:
-			panic(fmt.Errorf("subtraction not supported for %s and %s", typeStr(l), typeStr(r)))
+			return nil, fmt.Errorf("subtraction not supported for %s and %s", e.typeStr(l), e.typeStr(r))
 		}
 	default:
-		panic(fmt.Errorf("subtraction not supported for %s", typeStr(l)))
+		return nil, fmt.Errorf("subtraction not supported for %s", e.typeStr(l))
 	}
 }
 
-func evalMulOperator(left, right any) any {
+func (e *Evaluator) evalMulOperator(left, right any) (any, error) {
 	switch l := left.(type) {
 	case int64:
 		switch r := right.(type) {
 		case int64:
-			return l * r
+			return l * r, nil
 		case float64:
-			return float64(l) * r
+			return float64(l) * r, nil
 		default:
-			panic(fmt.Errorf("multiplication not supported for %s and %s", typeStr(l), typeStr(r)))
+			return nil, fmt.Errorf("multiplication not supported for %s and %s", e.typeStr(l), e.typeStr(r))
 		}
 	case float64:
 		switch r := right.(type) {
 		case int64:
-			return l * float64(r)
+			return l * float64(r), nil
 		case float64:
-			return l * r
+			return l * r, nil
 		default:
-			panic(fmt.Errorf("multiplication not supported for %s and %s", typeStr(l), typeStr(r)))
+			return nil, fmt.Errorf("multiplication not supported for %s and %s", e.typeStr(l), e.typeStr(r))
 		}
 	default:
-		panic(fmt.Errorf("multiplication not supported for %s", typeStr(l)))
+		return nil, fmt.Errorf("multiplication not supported for %s", e.typeStr(l))
 	}
 }
 
-func evalDivOperator(left, right any) any {
+func (e *Evaluator) evalDivOperator(left, right any) (any, error) {
 	switch l := left.(type) {
 	case int64:
 		switch r := right.(type) {
 		case int64:
-			return l / r
+			return l / r, nil
 		case float64:
-			return float64(l) / r
+			return float64(l) / r, nil
 		default:
-			panic(fmt.Errorf("division not supported for %s and %s", typeStr(l), typeStr(r)))
+			return nil, fmt.Errorf("division not supported for %s and %s", e.typeStr(l), e.typeStr(r))
 		}
 	case float64:
 		switch r := right.(type) {
 		case int64:
-			return l / float64(r)
+			return l / float64(r), nil
 		case float64:
-			return l / r
+			return l / r, nil
 		default:
-			panic(fmt.Errorf("division not supported for %s and %s", typeStr(l), typeStr(r)))
+			return nil, fmt.Errorf("division not supported for %s and %s", e.typeStr(l), e.typeStr(r))
 		}
 	default:
-		panic(fmt.Errorf("division not supported for %s", typeStr(l)))
+		return nil, fmt.Errorf("division not supported for %s", e.typeStr(l))
 	}
 }
 
-func evalLtOperator(left, right any) bool {
+func (e *Evaluator) evalLtOperator(left, right any) (any, error) {
 	switch l := left.(type) {
 	case int64:
 		switch r := right.(type) {
 		case int64:
-			return l < r
+			return l < r, nil
 		case float64:
-			return float64(l) < r
+			return float64(l) < r, nil
 		default:
-			panic(fmt.Errorf("cannot compare types %s and %s", typeStr(l), typeStr(r)))
+			return nil, fmt.Errorf("cannot compare types %s and %s", e.typeStr(l), e.typeStr(r))
 		}
 	case float64:
 		switch r := right.(type) {
 		case int64:
-			return l < float64(r)
+			return l < float64(r), nil
 		case float64:
-			return l < r
+			return l < r, nil
 		default:
-			panic(fmt.Errorf("cannot compare types %s and %s", typeStr(l), typeStr(r)))
+			return nil, fmt.Errorf("cannot compare types %s and %s", e.typeStr(l), e.typeStr(r))
 		}
 	case string:
 		switch r := right.(type) {
 		case string:
-			return l < r
+			return l < r, nil
 		default:
-			panic(fmt.Errorf("cannot compare types %s and %s", typeStr(l), typeStr(r)))
+			return nil, fmt.Errorf("cannot compare types %s and %s", e.typeStr(l), e.typeStr(r))
 		}
 	default:
-		panic(fmt.Errorf("comparison not supported for %s", typeStr(l)))
+		return nil, fmt.Errorf("comparison not supported for %s", e.typeStr(l))
 	}
 }
 
-func evalGtOperator(left, right any) bool {
-	return !evalLtOperator(left, right) && !evalEqOperator(left, right)
+func (e *Evaluator) evalGtOperator(left, right any) (any, error) {
+	e1, err := e.evalLtOperator(left, right)
+	if err != nil {
+		return nil, err
+	}
+	e2, err := e.evalEqOperator(left, right)
+	if err != nil {
+		return nil, err
+	}
+	return !e1.(bool) && !e2.(bool), nil
 }
 
-func evalEqOperator(left, right any) bool {
+func (e *Evaluator) evalEqOperator(left, right any) (any, error) {
 	switch l := left.(type) {
 	case int64:
 		switch r := right.(type) {
 		case int64:
-			return l == r
+			return l == r, nil
 		case float64:
-			return float64(l) == r
+			return float64(l) == r, nil
 		default:
-			return false
+			return nil, fmt.Errorf("equality not supported for types %s and %s", e.typeStr(l), e.typeStr(r))
 		}
 	case float64:
 		switch r := right.(type) {
 		case int64:
-			return l == float64(r)
+			return l == float64(r), nil
 		case float64:
-			return l == r
+			return l == r, nil
 		default:
-			return false
+			return nil, fmt.Errorf("equality not supported for types %s and %s", e.typeStr(l), e.typeStr(r))
 		}
 	case bool:
 		switch r := right.(type) {
 		case bool:
-			return l == r
+			return l == r, nil
 		default:
-			return false
+			return nil, fmt.Errorf("equality not supported for types %s and %s", e.typeStr(l), e.typeStr(r))
 		}
 	case string:
 		switch r := right.(type) {
 		case string:
-			return l == r
+			return l == r, nil
 		default:
-			return false
+			return nil, fmt.Errorf("equality not supported for types %s and %s", e.typeStr(l), e.typeStr(r))
 		}
 	case *objects.ArrayObject:
 		switch r := right.(type) {
 		case *objects.ArrayObject:
-			return slices.Equal(l.List, r.List)
+			return slices.Equal(l.List, r.List), nil
 		default:
-			return false
+			return nil, fmt.Errorf("equality not supported for types %s and %s", e.typeStr(l), e.typeStr(r))
 		}
 	case *objects.MapObject:
 		switch r := right.(type) {
 		case *objects.MapObject:
-			return maps.Equal(l.Map, r.Map)
+			return maps.Equal(l.Map, r.Map), nil
 		default:
-			return false
+			return nil, fmt.Errorf("equality not supported for types %s and %s", e.typeStr(l), e.typeStr(r))
 		}
 	default:
-		return false
+		return nil, fmt.Errorf("equality not supported for %s", e.typeStr(l))
 	}
 }
 
-func evalPrefixExpression(e *ast.PrefixExpression) any {
-	right := evalExpression(e.Right)
-	switch e.Operator {
+func (e *Evaluator) evalPrefixExpression(expr *ast.PrefixExpression) (any, error) {
+	right, err := e.evalExpression(expr.Right)
+	if err != nil {
+		return nil, err
+	}
+
+	switch expr.Operator {
 	case "!":
-		return evalBangOperator(right)
+		return e.evalBangOperator(right)
 	case "-":
-		return evalNegateOperator(right)
+		return e.evalNegateOperator(right)
 	default:
-		panic(fmt.Errorf("unknown operator %s", e.Operator))
+		return nil, fmt.Errorf("unknown operator %s", expr.Operator)
 	}
 }
 
-func evalBangOperator(e any) any {
-	return !isTruthy(e)
+func (e *Evaluator) evalBangOperator(expr any) (any, error) {
+	return !isTruthy(expr), nil
 }
 
-func evalNegateOperator(e any) any {
-	switch v := e.(type) {
+func (e *Evaluator) evalNegateOperator(expr any) (any, error) {
+	switch v := expr.(type) {
 	case int64:
-		return -v
+		return -v, nil
 	case float64:
-		return -v
+		return -v, nil
 	default:
-		panic(fmt.Errorf("cannot negate value of type %s", typeStr(e)))
+		return nil, fmt.Errorf("cannot negate value of type %s", e.typeStr(e))
 	}
 }
 
-func valueStr(val any) string {
-	f, _ := ctxt.GetBuiltIn("str")
-	str := f.(context.BuiltIn)
-
-	return str(val).(string)
+func (e *Evaluator) valueStr(val any) string {
+	return strings.From(val)
 }
 
-func typeStr(val any) string {
-	f, _ := ctxt.GetBuiltIn("type")
-	ty := f.(context.BuiltIn)
-
-	return ty(val).(string)
+func (e *Evaluator) typeStr(val any) string {
+	return builtin.TypeStr(val)
 }
 
 func isTruthy(value any) bool {
@@ -674,4 +857,8 @@ func isTruthy(value any) bool {
 	default:
 		return true
 	}
+}
+
+func (e *Evaluator) addError(err error) {
+	e.Errors = append(e.Errors, err)
 }

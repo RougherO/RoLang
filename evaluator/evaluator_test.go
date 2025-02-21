@@ -1,14 +1,13 @@
 package evaluator
 
 import (
-	"RoLang/evaluator/env"
 	"RoLang/evaluator/objects"
 	"RoLang/lexer"
 	"RoLang/parser"
-	"regexp"
 
 	"bytes"
 	"math"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -92,8 +91,8 @@ func TestAssignExpression(t *testing.T) {
 
 	program := p.Parse()
 
-	Init(nil, nil, nil)
-	Evaluate(program)
+	e := New()
+	e.Evaluate(program)
 
 	if !testIdentifier(t, "x", int64(2)) {
 		return
@@ -284,7 +283,6 @@ func TestPrefixOperator(t *testing.T) {
 
 func TestErrorStatements(t *testing.T) {
 	err := new(bytes.Buffer)
-	Init(nil, nil, err)
 
 	tests := []struct {
 		input  string
@@ -297,7 +295,6 @@ func TestErrorStatements(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		ctxt.Env = env.New(nil) // reset environement for each test to prevent name clash
 		testEvalStatements(test.input)
 		if !testErrors(t, err, test.expect) {
 			t.Logf("test[%d]\n", i)
@@ -307,9 +304,6 @@ func TestErrorStatements(t *testing.T) {
 }
 
 func TestOutStatements(t *testing.T) {
-	out := new(bytes.Buffer)
-
-	Init(nil, out, nil)
 
 }
 
@@ -336,8 +330,8 @@ func testLetStatements(t *testing.T, input string, expects []expectType) bool {
 	return isValid
 }
 
-func testIdentifier(t *testing.T, name string, expect any) bool {
-	value, ok := ctxt.Env.Get(name)
+func testIdentifier(t *testing.T, eval *Evaluator, name string, expect any) bool {
+	value, ok := eval.env.Get(name)
 	if !ok {
 		t.Errorf("no identifier found %s", name)
 		return false
@@ -356,7 +350,9 @@ func testEvalStatements(input string) {
 	p := parser.New(l)
 
 	program := p.Parse()
-	Evaluate(program)
+	e := New()
+
+	e.Evaluate(program)
 }
 
 func testEvalExpression(input string) any {
@@ -364,7 +360,8 @@ func testEvalExpression(input string) any {
 	p := parser.New(l)
 
 	expr := p.ParseExpression(parser.NONE)
-	return evalExpression(expr)
+	e := New()
+	return e.evalExpression(expr)
 }
 
 func testPrimaryObject(t *testing.T, obj any, expect any) bool {
