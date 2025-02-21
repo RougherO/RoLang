@@ -994,6 +994,10 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 			"x = y = z",
 			"(x = (y = z))",
 		},
+		{
+			"x.y == a.b",
+			"((x . y) == (a . b))",
+		},
 	}
 
 	for _, test := range tests {

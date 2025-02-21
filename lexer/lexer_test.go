@@ -33,6 +33,7 @@ if 5 < 10 {
 [1, 2]
 {"hello": "world"}
 loop x < 1 {}
+a.b
 `
 
 	tests := []struct {
@@ -128,6 +129,9 @@ loop x < 1 {}
 		{token.INT, "1"},
 		{token.LBRACE, "{"},
 		{token.RBRACE, "}"},
+		{token.IDENT, "a"},
+		{token.DOT, "."},
+		{token.IDENT, "b"},
 		{token.EOF, "eof"},
 	}
 

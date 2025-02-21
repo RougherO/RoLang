@@ -41,6 +41,7 @@ const (
 	PRODUCT            // * /
 	PREFIX             // !x -x
 	POSTFIX            // x() x++ x[1]
+	DOT                // a.b
 )
 
 func New(lexer *lexer.Lexer) *Parser {
@@ -76,6 +77,7 @@ func New(lexer *lexer.Lexer) *Parser {
 		token.LE:     {nil, p.parseInfixExpression, COMPARE},
 		token.GT:     {nil, p.parseInfixExpression, COMPARE},
 		token.GE:     {nil, p.parseInfixExpression, COMPARE},
+		token.DOT:    {nil, p.parseInfixExpression, DOT},
 	}
 
 	// Read two tokens, to set currToken and nextToken
