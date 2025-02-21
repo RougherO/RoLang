@@ -19,7 +19,8 @@ func New() *Map {
 		"len":    m.lenSanitizer,
 		"insert": m.insertSanitizer,
 		"erase":  m.eraseSanitizer,
-		"clone":  m.cloneSanitizer,
+		"concat": m.concatSanitizer,
+		"copy":   m.copySanitizer,
 	}
 
 	return m
@@ -75,20 +76,39 @@ func (m *Map) eraseSanitizer(args ...any) (any, error) {
 	return mp.Erase(args[1]), nil
 }
 
-func (m *Map) cloneSanitizer(args ...any) (any, error) {
+func (m *Map) concatSanitizer(args ...any) (any, error) {
+	mps := &objects.MapObject{Map: make(map[any]any)}
+
+	for i, arg := range args {
+		mp, ok := arg.(*objects.MapObject)
+		if !ok {
+			return nil, fmt.Errorf("concat expects all arguments to be map, arg=%d got=%s",
+				i+1, builtin.TypeStr(arg))
+		}
+		Concat(mps, mp)
+	}
+
+	return mps, nil
+}
+
+func (m *Map) copySanitizer(args ...any) (any, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf("clone expects one argument, got=%d", len(args))
+		return nil, fmt.Errorf("copy expects one argument, got=%d", len(args))
 	}
 
 	mp, ok := args[0].(*objects.MapObject)
 	if !ok {
-		return nil, fmt.Errorf("clone expects argument to be a map, got=%s",
+		return nil, fmt.Errorf("copy expects argument to be a map, got=%s",
 			builtin.TypeStr(args[0]))
 	}
 
-	mpClone := &objects.MapObject{
+	mpCopy := &objects.MapObject{
 		Map: maps.Clone(mp.Map),
 	}
 
-	return mpClone, nil
+	return mpCopy, nil
+}
+
+func Concat(mps *objects.MapObject, mp *objects.MapObject) {
+	maps.Copy(mps.Map, mp.Map)
 }

@@ -115,7 +115,7 @@ func (s *String) splitSpaceSanitizer(args ...any) (any, error) {
 			builtin.TypeStr(args[0]))
 	}
 
-	return Split(str, " "), nil
+	return SplitSpace(str), nil
 }
 
 func From(value any) string {
@@ -178,6 +178,17 @@ func Trim(str string, cut string) string {
 func Split(str string, sep string) *objects.ArrayObject {
 	result := &objects.ArrayObject{}
 	splits := strings.Split(str, sep)
+
+	for _, split := range splits {
+		result.List = append(result.List, split)
+	}
+
+	return result
+}
+
+func SplitSpace(str string) *objects.ArrayObject {
+	result := &objects.ArrayObject{}
+	splits := strings.Fields(str)
 
 	for _, split := range splits {
 		result.List = append(result.List, split)

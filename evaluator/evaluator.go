@@ -304,7 +304,7 @@ func (e *Evaluator) evalIndexExpression(expr *ast.IndexExpression) (any, error) 
 		}
 		index, ok := right.(int64)
 		if !ok {
-			return nil, fmt.Errorf("expect integer index, got=%s", e.typeStr(index))
+			return nil, fmt.Errorf("expect integer index, got=%s", builtin.TypeStr(index))
 		}
 
 		if index >= int64(len(v.List)) || index < 0 {
@@ -328,11 +328,11 @@ func (e *Evaluator) evalIndexExpression(expr *ast.IndexExpression) (any, error) 
 			return v.Map[right], nil
 		default:
 			return nil, fmt.Errorf("only int, float, string and bool is allowed as key. got=%s",
-				e.typeStr(v))
+				builtin.TypeStr(v))
 		}
 	}
 
-	return nil, fmt.Errorf("cannot index on type %s", e.typeStr(left))
+	return nil, fmt.Errorf("cannot index on type %s", builtin.TypeStr(left))
 }
 
 func (e *Evaluator) evalCallExpression(expr *ast.CallExpression) (any, error) {
@@ -407,7 +407,7 @@ func (e *Evaluator) callFunction(function any, args []any) (retValue any, errVal
 	case common.Sanitizer:
 		return obj(args...)
 	default:
-		return nil, fmt.Errorf("not a callable %s", e.typeStr(function))
+		return nil, fmt.Errorf("not a callable %s", builtin.TypeStr(function))
 	}
 }
 
@@ -507,7 +507,7 @@ func (e *Evaluator) evalAssignExpression(expr *ast.AssignExpression) (any, error
 
 			index, ok := indexExpr.(int64)
 			if !ok {
-				return nil, fmt.Errorf("expect integer index, got=%s", e.typeStr(index))
+				return nil, fmt.Errorf("expect integer index, got=%s", builtin.TypeStr(index))
 			}
 
 			if index >= int64(len(v.List)) || index < 0 {
@@ -532,7 +532,7 @@ func (e *Evaluator) evalAssignExpression(expr *ast.AssignExpression) (any, error
 				v.Map[index] = right
 			default:
 				return nil, fmt.Errorf("only int, float, string and bool is allowed as key. got=%s",
-					e.typeStr(v))
+					builtin.TypeStr(v))
 			}
 		}
 	}
@@ -547,10 +547,11 @@ func (e *Evaluator) evalModuleOperator(left, right any) (any, error) {
 		case *ast.Identifier:
 			return e.stdlib.GetModuleDispatcher(l.Value, r.Value)
 		default:
-			return nil, fmt.Errorf("expect identifier after dot operator found %s", e.valueStr(r))
+			return nil, fmt.Errorf("expect identifier after dot operator found %s",
+				strings.From(r))
 		}
 	default:
-		return nil, fmt.Errorf("cannot use dot operator with %s", e.typeStr(l))
+		return nil, fmt.Errorf("cannot use dot operator with %s", builtin.TypeStr(l))
 	}
 }
 
@@ -563,9 +564,10 @@ func (e *Evaluator) evalAddOperator(left, right any) (any, error) {
 		case float64:
 			return float64(l) + r, nil
 		case string:
-			return e.valueStr(l) + e.valueStr(r), nil
+			return strings.From(l) + strings.From(r), nil
 		default:
-			return nil, fmt.Errorf("addition not supported for %s and %s", e.typeStr(l), e.typeStr(r))
+			return nil, fmt.Errorf("addition not supported for %s and %s",
+				builtin.TypeStr(l), builtin.TypeStr(r))
 		}
 	case float64:
 		switch r := right.(type) {
@@ -574,20 +576,22 @@ func (e *Evaluator) evalAddOperator(left, right any) (any, error) {
 		case float64:
 			return l + r, nil
 		case string:
-			return e.valueStr(l) + e.valueStr(r), nil
+			return strings.From(l) + strings.From(r), nil
 		default:
-			return nil, fmt.Errorf("addition not supported for %s and %s", e.typeStr(l), e.typeStr(r))
+			return nil, fmt.Errorf("addition not supported for %s and %s",
+				builtin.TypeStr(l), builtin.TypeStr(r))
 		}
 	case string:
 		switch r := right.(type) {
 		case string:
-			return e.valueStr(l) + e.valueStr(r), nil
+			return strings.From(l) + strings.From(r), nil
 		case int64:
-			return e.valueStr(l) + e.valueStr(r), nil
+			return strings.From(l) + strings.From(r), nil
 		case float64:
-			return e.valueStr(l) + e.valueStr(r), nil
+			return strings.From(l) + strings.From(r), nil
 		default:
-			return nil, fmt.Errorf("addition not supported for %s and %s", e.typeStr(l), e.typeStr(r))
+			return nil, fmt.Errorf("addition not supported for %s and %s",
+				builtin.TypeStr(l), builtin.TypeStr(r))
 		}
 	case *objects.ArrayObject:
 		switch r := right.(type) {
@@ -596,7 +600,8 @@ func (e *Evaluator) evalAddOperator(left, right any) (any, error) {
 				List: slices.Concat(l.List, r.List),
 			}, nil
 		default:
-			return nil, fmt.Errorf("addition not supported for %s and %s", e.typeStr(l), e.typeStr(r))
+			return nil, fmt.Errorf("addition not supported for %s and %s",
+				builtin.TypeStr(l), builtin.TypeStr(r))
 		}
 	case *objects.MapObject:
 		switch r := right.(type) {
@@ -608,10 +613,11 @@ func (e *Evaluator) evalAddOperator(left, right any) (any, error) {
 			maps.Copy(mapObj.Map, r.Map)
 			return mapObj, nil
 		default:
-			return nil, fmt.Errorf("addition not supported for %s and %s", e.typeStr(l), e.typeStr(r))
+			return nil, fmt.Errorf("addition not supported for %s and %s",
+				builtin.TypeStr(l), builtin.TypeStr(r))
 		}
 	default:
-		return nil, fmt.Errorf("addition not supported for %s", e.typeStr(l))
+		return nil, fmt.Errorf("addition not supported for %s", builtin.TypeStr(l))
 	}
 }
 
@@ -624,7 +630,8 @@ func (e *Evaluator) evalSubOperator(left, right any) (any, error) {
 		case float64:
 			return float64(l) - r, nil
 		default:
-			return nil, fmt.Errorf("subtraction not supported for %s and %s", e.typeStr(l), e.typeStr(r))
+			return nil, fmt.Errorf("subtraction not supported for %s and %s",
+				builtin.TypeStr(l), builtin.TypeStr(r))
 		}
 	case float64:
 		switch r := right.(type) {
@@ -633,10 +640,11 @@ func (e *Evaluator) evalSubOperator(left, right any) (any, error) {
 		case float64:
 			return l - r, nil
 		default:
-			return nil, fmt.Errorf("subtraction not supported for %s and %s", e.typeStr(l), e.typeStr(r))
+			return nil, fmt.Errorf("subtraction not supported for %s and %s",
+				builtin.TypeStr(l), builtin.TypeStr(r))
 		}
 	default:
-		return nil, fmt.Errorf("subtraction not supported for %s", e.typeStr(l))
+		return nil, fmt.Errorf("subtraction not supported for %s", builtin.TypeStr(l))
 	}
 }
 
@@ -649,7 +657,8 @@ func (e *Evaluator) evalMulOperator(left, right any) (any, error) {
 		case float64:
 			return float64(l) * r, nil
 		default:
-			return nil, fmt.Errorf("multiplication not supported for %s and %s", e.typeStr(l), e.typeStr(r))
+			return nil, fmt.Errorf("multiplication not supported for %s and %s",
+				builtin.TypeStr(l), builtin.TypeStr(r))
 		}
 	case float64:
 		switch r := right.(type) {
@@ -658,10 +667,11 @@ func (e *Evaluator) evalMulOperator(left, right any) (any, error) {
 		case float64:
 			return l * r, nil
 		default:
-			return nil, fmt.Errorf("multiplication not supported for %s and %s", e.typeStr(l), e.typeStr(r))
+			return nil, fmt.Errorf("multiplication not supported for %s and %s",
+				builtin.TypeStr(l), builtin.TypeStr(r))
 		}
 	default:
-		return nil, fmt.Errorf("multiplication not supported for %s", e.typeStr(l))
+		return nil, fmt.Errorf("multiplication not supported for %s", builtin.TypeStr(l))
 	}
 }
 
@@ -674,7 +684,8 @@ func (e *Evaluator) evalDivOperator(left, right any) (any, error) {
 		case float64:
 			return float64(l) / r, nil
 		default:
-			return nil, fmt.Errorf("division not supported for %s and %s", e.typeStr(l), e.typeStr(r))
+			return nil, fmt.Errorf("division not supported for %s and %s",
+				builtin.TypeStr(l), builtin.TypeStr(r))
 		}
 	case float64:
 		switch r := right.(type) {
@@ -683,10 +694,11 @@ func (e *Evaluator) evalDivOperator(left, right any) (any, error) {
 		case float64:
 			return l / r, nil
 		default:
-			return nil, fmt.Errorf("division not supported for %s and %s", e.typeStr(l), e.typeStr(r))
+			return nil, fmt.Errorf("division not supported for %s and %s",
+				builtin.TypeStr(l), builtin.TypeStr(r))
 		}
 	default:
-		return nil, fmt.Errorf("division not supported for %s", e.typeStr(l))
+		return nil, fmt.Errorf("division not supported for %s", builtin.TypeStr(l))
 	}
 }
 
@@ -699,7 +711,8 @@ func (e *Evaluator) evalLtOperator(left, right any) (any, error) {
 		case float64:
 			return float64(l) < r, nil
 		default:
-			return nil, fmt.Errorf("cannot compare types %s and %s", e.typeStr(l), e.typeStr(r))
+			return nil, fmt.Errorf("cannot compare types %s and %s",
+				builtin.TypeStr(l), builtin.TypeStr(r))
 		}
 	case float64:
 		switch r := right.(type) {
@@ -708,17 +721,19 @@ func (e *Evaluator) evalLtOperator(left, right any) (any, error) {
 		case float64:
 			return l < r, nil
 		default:
-			return nil, fmt.Errorf("cannot compare types %s and %s", e.typeStr(l), e.typeStr(r))
+			return nil, fmt.Errorf("cannot compare types %s and %s",
+				builtin.TypeStr(l), builtin.TypeStr(r))
 		}
 	case string:
 		switch r := right.(type) {
 		case string:
 			return l < r, nil
 		default:
-			return nil, fmt.Errorf("cannot compare types %s and %s", e.typeStr(l), e.typeStr(r))
+			return nil, fmt.Errorf("cannot compare types %s and %s",
+				builtin.TypeStr(l), builtin.TypeStr(r))
 		}
 	default:
-		return nil, fmt.Errorf("comparison not supported for %s", e.typeStr(l))
+		return nil, fmt.Errorf("comparison not supported for %s", builtin.TypeStr(l))
 	}
 }
 
@@ -743,7 +758,8 @@ func (e *Evaluator) evalEqOperator(left, right any) (any, error) {
 		case float64:
 			return float64(l) == r, nil
 		default:
-			return nil, fmt.Errorf("equality not supported for types %s and %s", e.typeStr(l), e.typeStr(r))
+			return nil, fmt.Errorf("equality not supported for types %s and %s",
+				builtin.TypeStr(l), builtin.TypeStr(r))
 		}
 	case float64:
 		switch r := right.(type) {
@@ -752,38 +768,43 @@ func (e *Evaluator) evalEqOperator(left, right any) (any, error) {
 		case float64:
 			return l == r, nil
 		default:
-			return nil, fmt.Errorf("equality not supported for types %s and %s", e.typeStr(l), e.typeStr(r))
+			return nil, fmt.Errorf("equality not supported for types %s and %s",
+				builtin.TypeStr(l), builtin.TypeStr(r))
 		}
 	case bool:
 		switch r := right.(type) {
 		case bool:
 			return l == r, nil
 		default:
-			return nil, fmt.Errorf("equality not supported for types %s and %s", e.typeStr(l), e.typeStr(r))
+			return nil, fmt.Errorf("equality not supported for types %s and %s",
+				builtin.TypeStr(l), builtin.TypeStr(r))
 		}
 	case string:
 		switch r := right.(type) {
 		case string:
 			return l == r, nil
 		default:
-			return nil, fmt.Errorf("equality not supported for types %s and %s", e.typeStr(l), e.typeStr(r))
+			return nil, fmt.Errorf("equality not supported for types %s and %s",
+				builtin.TypeStr(l), builtin.TypeStr(r))
 		}
 	case *objects.ArrayObject:
 		switch r := right.(type) {
 		case *objects.ArrayObject:
 			return slices.Equal(l.List, r.List), nil
 		default:
-			return nil, fmt.Errorf("equality not supported for types %s and %s", e.typeStr(l), e.typeStr(r))
+			return nil, fmt.Errorf("equality not supported for types %s and %s",
+				builtin.TypeStr(l), builtin.TypeStr(r))
 		}
 	case *objects.MapObject:
 		switch r := right.(type) {
 		case *objects.MapObject:
 			return maps.Equal(l.Map, r.Map), nil
 		default:
-			return nil, fmt.Errorf("equality not supported for types %s and %s", e.typeStr(l), e.typeStr(r))
+			return nil, fmt.Errorf("equality not supported for types %s and %s",
+				builtin.TypeStr(l), builtin.TypeStr(r))
 		}
 	default:
-		return nil, fmt.Errorf("equality not supported for %s", e.typeStr(l))
+		return nil, fmt.Errorf("equality not supported for %s", builtin.TypeStr(l))
 	}
 }
 
@@ -814,16 +835,8 @@ func (e *Evaluator) evalNegateOperator(expr any) (any, error) {
 	case float64:
 		return -v, nil
 	default:
-		return nil, fmt.Errorf("cannot negate value of type %s", e.typeStr(e))
+		return nil, fmt.Errorf("cannot negate value of type %s", builtin.TypeStr(e))
 	}
-}
-
-func (e *Evaluator) valueStr(val any) string {
-	return strings.From(val)
-}
-
-func (e *Evaluator) typeStr(val any) string {
-	return builtin.TypeStr(val)
 }
 
 func isTruthy(value any) bool {

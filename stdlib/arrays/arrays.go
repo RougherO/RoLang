@@ -22,7 +22,7 @@ func New() *Arrays {
 		"insert": a.insertSanitizer,
 		"erase":  a.eraseSanitizer,
 		"concat": a.concatSanitizer,
-		"clone":  a.cloneSanitizer,
+		"copy":   a.copySanitizer,
 	}
 
 	return a
@@ -61,12 +61,7 @@ func (a *Arrays) pushSanitizer(args ...any) (any, error) {
 			builtin.TypeStr(args[0]))
 	}
 
-	err := arr.Insert(int(arr.Len()), args[0])
-	if err != nil {
-		return nil, err
-	}
-
-	return nil, nil
+	return nil, arr.Insert(int(arr.Len()), args[0])
 }
 
 func (a *Arrays) popSanitizer(args ...any) (any, error) {
@@ -98,9 +93,8 @@ func (a *Arrays) insertSanitizer(args ...any) (any, error) {
 		return nil, fmt.Errorf("insert expects second argument to be int, got=%s",
 			builtin.TypeStr(args[1]))
 	}
-	arr.Insert(int(index), args[2])
 
-	return nil, nil
+	return nil, arr.Insert(int(index), args[2])
 }
 
 func (a *Arrays) eraseSanitizer(args ...any) (any, error) {
@@ -139,19 +133,19 @@ func (a *Arrays) concatSanitizer(args ...any) (any, error) {
 	return concat, nil
 }
 
-func (a *Arrays) cloneSanitizer(args ...any) (any, error) {
+func (a *Arrays) copySanitizer(args ...any) (any, error) {
 	if len(args) != 1 {
-		return nil, fmt.Errorf("clone expects one argument, got=%d", len(args))
+		return nil, fmt.Errorf("copy expects one argument, got=%d", len(args))
 	}
 
 	arr, ok := args[0].(*objects.ArrayObject)
 	if !ok {
-		return nil, fmt.Errorf("clone expects argument to be array, got=%s", builtin.TypeStr(args[0]))
+		return nil, fmt.Errorf("copy expects argument to be array, got=%s", builtin.TypeStr(args[0]))
 	}
 
-	arrClone := &objects.ArrayObject{
+	arrCopy := &objects.ArrayObject{
 		List: slices.Clone(arr.List),
 	}
 
-	return arrClone, nil
+	return arrCopy, nil
 }

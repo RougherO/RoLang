@@ -1,0 +1,17 @@
+io.print("Enter your name: ");
+let name = io.readln();
+
+io.print("Enter your surname: ");
+let surname = io.readln();
+
+io.print("Enter your age: ");
+let age = io.readln();
+
+io.println("Hi " + name + " " + surname + ". You are " + age + " years old.");
+
+
+let list1 = [1, 2, 3];
+let list2 = [4, 5, 6];
+let line = io.readln();
+line = strings.splitSpace(line);
+io.println(list1 + list2 + line);
