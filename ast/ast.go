@@ -8,19 +8,17 @@ import (
 
 type (
 	Node interface {
-		TokenWord() string
+		Location() token.SrcLoc
 		String() string
 	}
 
 	Statement interface {
 		Node
-		Location() token.SrcLoc
 		Statement()
 	}
 
 	Expression interface {
 		Node
-		Location() token.SrcLoc
 		Expression()
 	}
 )
@@ -148,18 +146,6 @@ type (
 	}
 )
 
-func (p *Program) TokenWord() string {
-	if len(p.Statements) > 0 {
-		var out string
-		for _, stmt := range p.Statements {
-			out += stmt.String()
-		}
-		return out
-	} else {
-		return ""
-	}
-}
-
 func (p *Program) String() string {
 	var out string
 
@@ -174,10 +160,6 @@ func (bs *BlockStatement) Location() token.SrcLoc {
 	return bs.Token.Loc
 }
 
-func (bs *BlockStatement) TokenWord() string {
-	return bs.Token.Word
-}
-
 func (bs *BlockStatement) String() string {
 	var out string
 	out += "{ "
@@ -189,10 +171,6 @@ func (bs *BlockStatement) String() string {
 }
 
 func (bs *BlockStatement) Statement() {}
-
-func (ls *LetStatement) TokenWord() string {
-	return ls.Token.Word
-}
 
 func (ls *LetStatement) String() string {
 	if ls.InitValue != nil {
@@ -207,10 +185,6 @@ func (ls *LetStatement) Location() token.SrcLoc {
 }
 
 func (ls *LetStatement) Statement() {}
-
-func (ls *LoopStatement) TokenWord() string {
-	return ls.Token.Word
-}
 
 func (ls *LoopStatement) String() string {
 	out := "loop "
@@ -229,10 +203,6 @@ func (ls *LoopStatement) Location() token.SrcLoc {
 }
 
 func (ls *LoopStatement) Statement() {}
-
-func (fs *FunctionStatement) TokenWord() string {
-	return fs.Token.Word
-}
 
 func (fs *FunctionStatement) String() string {
 	var params string
@@ -253,10 +223,6 @@ func (fs *FunctionStatement) Location() token.SrcLoc {
 
 func (fs *FunctionStatement) Statement() {}
 
-func (rs *ReturnStatement) TokenWord() string {
-	return rs.Token.Word
-}
-
 func (rs *ReturnStatement) String() string {
 	if rs.ReturnValue != nil {
 		return fmt.Sprintf("return %s;", rs.ReturnValue)
@@ -271,10 +237,6 @@ func (rs *ReturnStatement) Location() token.SrcLoc {
 
 func (rs *ReturnStatement) Statement() {}
 
-func (es *ExpressionStatement) TokenWord() string {
-	return es.Token.Word
-}
-
 func (es *ExpressionStatement) String() string {
 	if es.Expression != nil {
 		return es.Expression.String()
@@ -288,10 +250,6 @@ func (es *ExpressionStatement) Location() token.SrcLoc {
 }
 
 func (es *ExpressionStatement) Statement() {}
-
-func (is *IfStatement) TokenWord() string {
-	return is.Token.Word
-}
 
 func (is *IfStatement) String() string {
 	var out string
@@ -310,10 +268,6 @@ func (is *IfStatement) Location() token.SrcLoc {
 
 func (is *IfStatement) Statement() {}
 
-func (ie *InfixExpression) TokenWord() string {
-	return ie.Token.Word
-}
-
 func (ie *InfixExpression) String() string {
 	return fmt.Sprintf("(%s %s %s)", ie.Left, ie.Operator, ie.Right)
 }
@@ -323,10 +277,6 @@ func (ie *InfixExpression) Location() token.SrcLoc {
 }
 
 func (ie *InfixExpression) Expression() {}
-
-func (pe *PrefixExpression) TokenWord() string {
-	return pe.Token.Word
-}
 
 func (pe *PrefixExpression) String() string {
 	return fmt.Sprintf("(%s%s)", pe.Operator, pe.Right)
@@ -338,10 +288,6 @@ func (pe *PrefixExpression) Location() token.SrcLoc {
 
 func (pe *PrefixExpression) Expression() {}
 
-func (id *Identifier) TokenWord() string {
-	return id.Token.Word
-}
-
 func (id *Identifier) String() string {
 	return id.Value
 }
@@ -352,10 +298,6 @@ func (id *Identifier) Location() token.SrcLoc {
 
 func (id *Identifier) Expression() {}
 
-func (ae *AssignExpression) TokenWord() string {
-	return ae.Token.Word
-}
-
 func (ae *AssignExpression) String() string {
 	return fmt.Sprintf("(%s = %s)", ae.Left, ae.Right)
 }
@@ -365,10 +307,6 @@ func (ae *AssignExpression) Location() token.SrcLoc {
 }
 
 func (ae *AssignExpression) Expression() {}
-
-func (ce *CallExpression) TokenWord() string {
-	return ce.Token.Word
-}
 
 func (ce *CallExpression) String() string {
 	var args string
@@ -389,10 +327,6 @@ func (ce *CallExpression) Location() token.SrcLoc {
 
 func (ce *CallExpression) Expression() {}
 
-func (ie *IndexExpression) TokenWord() string {
-	return ie.Token.Word
-}
-
 func (ie *IndexExpression) String() string {
 	return fmt.Sprintf("(%s[%s])", ie.Left, ie.Index)
 }
@@ -402,10 +336,6 @@ func (ie *IndexExpression) Location() token.SrcLoc {
 }
 
 func (ie *IndexExpression) Expression() {}
-
-func (fl *FunctionLiteral) TokenWord() string {
-	return fl.Token.Word
-}
 
 func (fl *FunctionLiteral) String() string {
 	var params string
@@ -425,12 +355,8 @@ func (fl *FunctionLiteral) Location() token.SrcLoc {
 
 func (fl *FunctionLiteral) Expression() {}
 
-func (il *IntegerLiteral) TokenWord() string {
-	return il.Token.Word
-}
-
 func (il *IntegerLiteral) String() string {
-	return il.TokenWord()
+	return il.Token.Word
 }
 
 func (il *IntegerLiteral) Location() token.SrcLoc {
@@ -439,12 +365,8 @@ func (il *IntegerLiteral) Location() token.SrcLoc {
 
 func (il *IntegerLiteral) Expression() {}
 
-func (fl *FloatLiteral) TokenWord() string {
-	return fl.Token.Word
-}
-
 func (fl *FloatLiteral) String() string {
-	return fl.TokenWord()
+	return fl.Token.Word
 }
 
 func (fl *FloatLiteral) Location() token.SrcLoc {
@@ -452,10 +374,6 @@ func (fl *FloatLiteral) Location() token.SrcLoc {
 }
 
 func (fl *FloatLiteral) Expression() {}
-
-func (al *ArrayLiteral) TokenWord() string {
-	return al.Token.Word
-}
 
 func (al *ArrayLiteral) String() string {
 	var out string
@@ -482,10 +400,6 @@ func (me *MapElement) String() string {
 	return fmt.Sprintf("%s:%s", me.Key, me.Value)
 }
 
-func (ml *MapLiteral) TokenWord() string {
-	return ml.Token.Word
-}
-
 func (ml *MapLiteral) String() string {
 	var out string
 	out += "{"
@@ -507,12 +421,8 @@ func (ml *MapLiteral) Location() token.SrcLoc {
 
 func (ml *MapLiteral) Expression() {}
 
-func (sl *StringLiteral) TokenWord() string {
-	return sl.Token.Word
-}
-
 func (sl *StringLiteral) String() string {
-	return `"` + sl.TokenWord() + `"`
+	return sl.Token.Word
 }
 
 func (sl *StringLiteral) Location() token.SrcLoc {
@@ -520,10 +430,6 @@ func (sl *StringLiteral) Location() token.SrcLoc {
 }
 
 func (sl *StringLiteral) Expression() {}
-
-func (bl *BoolLiteral) TokenWord() string {
-	return bl.Token.Word
-}
 
 func (bl *BoolLiteral) String() string {
 	return bl.Token.Word

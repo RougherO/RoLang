@@ -12,7 +12,7 @@ import (
 type Parser struct {
 	lexer *lexer.Lexer
 	// all error messages generated while parsing
-	errors []string
+	errors []error
 	// pointers for reading tokens
 	currToken token.Token
 	nextToken token.Token
@@ -47,7 +47,7 @@ const (
 func New(lexer *lexer.Lexer) *Parser {
 	p := &Parser{
 		lexer:  lexer,
-		errors: []string{},
+		errors: []error{},
 	}
 
 	// TODO put this into a global variable so that every time a parser
@@ -87,28 +87,26 @@ func New(lexer *lexer.Lexer) *Parser {
 	return p
 }
 
-func (p *Parser) Parse() *ast.Program {
+func (p *Parser) Parse() (*ast.Program, []error) {
 	program := &ast.Program{}
 	program.Statements = []ast.Statement{}
 
 	// Read until end of file
 	for !p.hasToken(token.EOF) {
 		stmt := p.ParseStatement()
-		if stmt == nil {
-			return nil
-		}
 		program.Statements = append(program.Statements, stmt)
 		// Set parser on the first token of next statement
 		p.readToken()
 	}
 
-	return program
+	return program, p.errors
 }
 
 func (p *Parser) ParseStatement() ast.Statement {
 	switch p.currToken.Type {
 	case token.LET:
-		return p.parseLetStatement()
+		a := p.parseLetStatement()
+		return a
 	case token.RETURN:
 		return p.parseReturnStatement()
 	case token.IF:
@@ -152,10 +150,6 @@ func (p *Parser) ParseExpression(precedence Precedence) ast.Expression {
 	}
 
 	return expr
-}
-
-func (p *Parser) Errors() []string {
-	return p.errors
 }
 
 func (p *Parser) parseFunctionStatement() *ast.FunctionStatement {
@@ -659,9 +653,9 @@ func (p *Parser) parseIntegerLiteral() ast.Expression {
 
 	value, err := strconv.ParseInt(p.currToken.Word, 0, 64)
 	if err != nil {
-		msg := fmt.Sprintf("could not parse %q as integer. %s",
+		err = fmt.Errorf("could not parse %q as integer. %s",
 			p.currToken.Word, err)
-		p.errors = append(p.errors, msg)
+		p.errors = append(p.errors, err)
 		return nil
 	}
 
@@ -675,9 +669,9 @@ func (p *Parser) parseFloatLiteral() ast.Expression {
 
 	value, err := strconv.ParseFloat(p.currToken.Word, 64)
 	if err != nil {
-		msg := fmt.Sprintf("could not parse %q as float. %s",
+		err = fmt.Errorf("could not parse %q as float. %s",
 			p.currToken.Word, err)
-		p.errors = append(p.errors, msg)
+		p.errors = append(p.errors, err)
 		return nil
 	}
 
@@ -735,6 +729,6 @@ func (p *Parser) noPrefixFuncError(tokenType token.TokenType) {
 }
 
 func (p *Parser) report(message string) {
-	message = fmt.Sprintf("%s %s", p.nextToken.Loc, message)
-	p.errors = append(p.errors, message)
+	err := fmt.Errorf("%s %s", p.nextToken.Loc, message)
+	p.errors = append(p.errors, err)
 }

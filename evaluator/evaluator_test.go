@@ -5,7 +5,7 @@ import (
 	"RoLang/lexer"
 	"RoLang/parser"
 
-	"bytes"
+	"errors"
 	"math"
 	"regexp"
 	"strings"
@@ -88,13 +88,14 @@ func TestAssignExpression(t *testing.T) {
 
 	l := lexer.New("evaluator_test_assign", input)
 	p := parser.New(l)
-
-	program := p.Parse()
-
 	e := New()
+
+	program, errs := p.Parse()
+	checkErrors(t, errs)
+
 	e.Evaluate(program)
 
-	if !testIdentifier(t, "x", int64(2)) {
+	if !testIdentifier(t, e, "x", int64(2)) {
 		return
 	}
 }
@@ -160,7 +161,7 @@ func TestInfixOperator(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		eval := testEvalExpression(test.input)
+		eval := testEvalExpression(t, test.input)
 		if !testPrimaryObject(t, eval, test.expect) {
 			t.Logf("test[%d]\n", i)
 		}
@@ -170,7 +171,7 @@ func TestInfixOperator(t *testing.T) {
 func TestArrayLiteral(t *testing.T) {
 	input := "[1, 2 * 2, 3 + 3]"
 
-	expr := testEvalExpression(input)
+	expr := testEvalExpression(t, input)
 	obj, ok := expr.(*objects.ArrayObject)
 	if !ok {
 		t.Fatalf("object is not Array. got=%T (%+v)", expr, expr)
@@ -195,7 +196,7 @@ func TestArrayLiteral(t *testing.T) {
 func TestMapLiteral(t *testing.T) {
 	input := `{"hello": 1, "world": 2}`
 
-	expr := testEvalExpression(input)
+	expr := testEvalExpression(t, input)
 	obj, ok := expr.(*objects.MapObject)
 	if !ok {
 		t.Fatalf("object is not Map. got=%T (%+v)", expr, expr)
@@ -249,7 +250,7 @@ func TestIndexExpression(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		eval := testEvalExpression(test.input)
+		eval := testEvalExpression(t, test.input)
 		if !testPrimaryObject(t, eval, test.expect) {
 			t.Logf("test[%d]\n", i)
 		}
@@ -274,7 +275,7 @@ func TestPrefixOperator(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		eval := testEvalExpression(test.input)
+		eval := testEvalExpression(t, test.input)
 		if !testPrimaryObject(t, eval, test.expect) {
 			t.Logf("test[%d]\n", i)
 		}
@@ -282,8 +283,6 @@ func TestPrefixOperator(t *testing.T) {
 }
 
 func TestErrorStatements(t *testing.T) {
-	err := new(bytes.Buffer)
-
 	tests := []struct {
 		input  string
 		expect string
@@ -291,15 +290,14 @@ func TestErrorStatements(t *testing.T) {
 		// {"let x = 1", "expected next token to be \";\", got \"eof\" instead"},
 		{"let x = y;", "variable not found: y"},
 		{"let x = 1; let y = x();", "not a callable int"},
-		{"fn f(){} let x = f(); x();", "cannot function call on null objects"},
+		{"fn f(){} let x = f(); x();", "not a callable null"},
 	}
 
 	for i, test := range tests {
-		testEvalStatements(test.input)
-		if !testErrors(t, err, test.expect) {
+		err := testEvalStatements(t, test.input)
+		if !testErrors(t, errors.Join(err...).Error(), test.expect) {
 			t.Logf("test[%d]\n", i)
 		}
-		err.Reset()
 	}
 }
 
@@ -308,23 +306,21 @@ func TestOutStatements(t *testing.T) {
 }
 
 func testLetStatements(t *testing.T, input string, expects []expectType) bool {
-	out := new(bytes.Buffer)
-	err := new(bytes.Buffer)
-
-	Init(nil, out, err)
-
 	l := lexer.New("evaluator_test", input)
 	p := parser.New(l)
+	e := New()
 
-	program := p.Parse()
-	Evaluate(program)
+	program, errs := p.Parse()
+	checkErrors(t, errs)
+
+	e.Evaluate(program)
 
 	isValid := true
 	for _, item := range expects {
 		name := item.name
 		expect := item.value
 
-		isValid = isValid && testIdentifier(t, name, expect)
+		isValid = isValid && testIdentifier(t, e, name, expect)
 	}
 
 	return isValid
@@ -345,23 +341,29 @@ func testIdentifier(t *testing.T, eval *Evaluator, name string, expect any) bool
 	return true
 }
 
-func testEvalStatements(input string) {
+func testEvalStatements(t *testing.T, input string) []error {
 	l := lexer.New("evaluator_test", input)
 	p := parser.New(l)
-
-	program := p.Parse()
 	e := New()
 
-	e.Evaluate(program)
+	program, errs := p.Parse()
+	checkErrors(t, errs)
+
+	return e.Evaluate(program)
 }
 
-func testEvalExpression(input string) any {
+func testEvalExpression(t *testing.T, input string) any {
 	l := lexer.New("evaluator_test", input)
 	p := parser.New(l)
+	e := New()
 
 	expr := p.ParseExpression(parser.NONE)
-	e := New()
-	return e.evalExpression(expr)
+	val, err := e.evalExpression(expr)
+	if err != nil {
+		checkErrors(t, []error{err})
+	}
+
+	return val
 }
 
 func testPrimaryObject(t *testing.T, obj any, expect any) bool {
@@ -429,10 +431,9 @@ func testFloatObject(t *testing.T, obj any, expect float64) bool {
 	return true
 }
 
-var re, _ = regexp.Compile(`runtime error:(\nevaluator_test:\d+:\d+: )+`)
+var re, _ = regexp.Compile(`(\nevaluator_test:\d+:\d+: )+`)
 
-func testErrors(t *testing.T, err *bytes.Buffer, expect string) bool {
-	errStr := err.String()
+func testErrors(t *testing.T, errStr string, expect string) bool {
 	errStr = strings.TrimPrefix(errStr, re.FindString(errStr)) // trim the location info
 	errStr = strings.TrimSpace(errStr)                         // trime surrounding spaces
 	if expect != errStr {
@@ -440,4 +441,10 @@ func testErrors(t *testing.T, err *bytes.Buffer, expect string) bool {
 		return false
 	}
 	return true
+}
+
+func checkErrors(t *testing.T, errs []error) {
+	if len(errs) != 0 {
+		t.Fatal(errors.Join(errs...))
+	}
 }

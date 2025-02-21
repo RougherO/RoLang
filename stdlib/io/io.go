@@ -42,7 +42,9 @@ func (io *Io) readlnSanitizer(args ...any) (any, error) {
 		return nil, fmt.Errorf("extra arguments in readln")
 	}
 
-	return io.scanner.ReadString('\n')
+	line, err := io.scanner.ReadString('\n')
+	line = line[:len(line)-1] // remove newline
+	return line, err
 }
 
 func (io *Io) printSanitizer(args ...any) (any, error) {

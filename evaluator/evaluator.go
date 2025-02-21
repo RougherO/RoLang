@@ -16,8 +16,7 @@ import (
 )
 
 type Evaluator struct {
-	Errors []error
-
+	errors   []error
 	env      *env.Environment
 	envStack []*env.Environment
 	stdlib   *stdlib.StdLib
@@ -25,18 +24,21 @@ type Evaluator struct {
 
 func New() *Evaluator {
 	return &Evaluator{
-		// context: *context.New(in, out),
 		env:    env.New(nil),
 		stdlib: stdlib.New(),
 	}
 }
 
-func (e *Evaluator) Evaluate(program *ast.Program) {
+func (e *Evaluator) Evaluate(program *ast.Program) []error {
 	defer e.recoveryHandler()
+	e.errors = nil
+
 	err := e.evalStatements(program.Statements)
 	if err != nil {
 		e.addError(err)
 	}
+
+	return e.errors
 }
 
 // for block scopes it should just enclose the current environment
@@ -88,30 +90,12 @@ func (e *Evaluator) recoveryHandler() {
 	}
 }
 
-func (e *Evaluator) exprErrorHandler(expr ast.Expression) {
-	err := recover()
-
+func (e *Evaluator) errorDecorator(node ast.Node, err error) error {
 	if err != nil {
-		switch err.(type) {
-		case objects.ReturnObject:
-			panic(err)
-		case error:
-			e.addError(fmt.Errorf("%s %s", expr.Location(), err))
-		}
+		return fmt.Errorf("\n%s %s", node.Location(), err)
 	}
-}
 
-func (e *Evaluator) stmtErrorHandler(stmt ast.Statement) {
-	err := recover()
-
-	if err != nil {
-		switch err.(type) {
-		case objects.ReturnObject:
-			panic(err)
-		case error:
-			e.addError(fmt.Errorf("%s %s", stmt.Location(), err))
-		}
-	}
+	return nil
 }
 
 func (e *Evaluator) evalStatements(stmts []ast.Statement) error {
@@ -128,30 +112,29 @@ func (e *Evaluator) evalStatements(stmts []ast.Statement) error {
 func (e *Evaluator) evalStatement(statement ast.Statement) error {
 	// error handler for statement panics
 	// used for adding source location to the error
-	defer e.stmtErrorHandler(statement)
+	var err error
 
 	switch stmt := statement.(type) {
 	case *ast.LetStatement:
-		return e.evalLetStatement(stmt)
+		err = e.evalLetStatement(stmt)
 	case *ast.FunctionStatement:
-		return e.evalFunctionStatement(stmt)
+		err = e.evalFunctionStatement(stmt)
 	case *ast.ReturnStatement:
-		return e.evalReturnStatement(stmt)
+		err = e.evalReturnStatement(stmt)
 	case *ast.IfStatement:
-		return e.evalIfStatement(stmt)
+		err = e.evalIfStatement(stmt)
 	case *ast.BlockStatement:
 		e.createEnv()
 		defer e.restoreEnv()
-		return e.evalStatements(stmt.Statements)
+		err = e.evalStatements(stmt.Statements)
 		// should pop out the current environment no matter what
 	case *ast.ExpressionStatement:
-		_, err := e.evalExpression(stmt.Expression)
-		return err
+		_, err = e.evalExpression(stmt.Expression)
 	case *ast.LoopStatement:
-		return e.evalLoopStatement(stmt)
+		err = e.evalLoopStatement(stmt)
 	}
 
-	return nil
+	return e.errorDecorator(statement, err)
 }
 
 func (e *Evaluator) evalFunctionStatement(function *ast.FunctionStatement) error {
@@ -237,39 +220,40 @@ func (e *Evaluator) evalIfStatement(ifStmt *ast.IfStatement) error {
 	return nil
 }
 
-func (e *Evaluator) evalExpression(expression ast.Expression) (any, error) {
-	defer e.exprErrorHandler(expression)
-
+func (e *Evaluator) evalExpression(expression ast.Expression) (value any, err error) {
 	switch expr := expression.(type) {
 	case *ast.InfixExpression:
-		return e.evalInfixExpression(expr)
+		value, err = e.evalInfixExpression(expr)
 	case *ast.PrefixExpression:
-		return e.evalPrefixExpression(expr)
+		value, err = e.evalPrefixExpression(expr)
 	case *ast.Identifier:
-		return e.evalIdentifier(expr)
+		value, err = e.evalIdentifier(expr)
 	case *ast.AssignExpression:
-		return e.evalAssignExpression(expr)
+		value, err = e.evalAssignExpression(expr)
 	case *ast.ArrayLiteral:
-		return e.evalArrayLiteral(expr)
+		value, err = e.evalArrayLiteral(expr)
 	case *ast.MapLiteral:
-		return e.evalMapLiteral(expr)
+		value, err = e.evalMapLiteral(expr)
 	case *ast.StringLiteral:
-		return expr.Value, nil
+		value, err = expr.Value, nil
 	case *ast.BoolLiteral:
-		return expr.Value, nil
+		value, err = expr.Value, nil
 	case *ast.IntegerLiteral:
-		return expr.Value, nil
+		value, err = expr.Value, nil
 	case *ast.FloatLiteral:
-		return expr.Value, nil
+		value, err = expr.Value, nil
 	case *ast.FunctionLiteral:
-		return e.evalFunctionLiteral(expr)
+		value, err = e.evalFunctionLiteral(expr)
 	case *ast.CallExpression:
-		return e.evalCallExpression(expr)
+		value, err = e.evalCallExpression(expr)
 	case *ast.IndexExpression:
-		return e.evalIndexExpression(expr)
+		value, err = e.evalIndexExpression(expr)
 	default:
 		panic(fmt.Errorf("unknown expression type %T", expression))
 	}
+
+	err = e.errorDecorator(expression, err)
+	return
 }
 
 func (e *Evaluator) evalArrayLiteral(expr *ast.ArrayLiteral) (*objects.ArrayObject, error) {
@@ -860,5 +844,5 @@ func isTruthy(value any) bool {
 }
 
 func (e *Evaluator) addError(err error) {
-	e.Errors = append(e.Errors, err)
+	e.errors = append(e.errors, err)
 }

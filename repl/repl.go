@@ -8,13 +8,21 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 )
 
 const prompt = "|> "
-const message = `RoLang v0.3 Tree-Walk Interpreter`
+const message = `RoLang v0.4 Tree-Walk Interpreter`
+
+func checkError(errs []error) bool {
+	if len(errs) != 0 {
+		fmt.Fprintln(os.Stderr, errors.Join(errs...))
+		return true
+	}
+
+	return false
+}
 
 func Start() {
 	fmt.Println(message)
@@ -36,19 +44,15 @@ func Start() {
 
 		l := lexer.New("repl", line)
 		p := parser.New(l)
-		program := p.Parse()
 
-		if len(p.Errors()) != 0 {
-			io.WriteString(os.Stderr, strings.Join(p.Errors(), "\n"))
-			io.WriteString(os.Stderr, "\n")
-			io.WriteString(os.Stdout, "null\n")
+		program, errs := p.Parse()
+		if checkError(errs) {
 			continue
 		}
 
-		e.Evaluate(program)
-		if len(e.Errors) != 0 {
-			fmt.Println(errors.Join(e.Errors...))
-			e.Errors = e.Errors[:0]
+		errs = e.Evaluate(program)
+		if checkError(errs) {
+			continue
 		}
 	}
 }
