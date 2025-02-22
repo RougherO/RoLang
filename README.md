@@ -62,8 +62,9 @@ It has an extremely easy language syntax, making it suitable for beginners new t
     | functions | fn () { return x + y; } |
     | arrays    | [1, 2.2, "hey"]         |
     | maps      | {"a": 1, "b": 2}        |
+    | null      | null                    |
 
-    > [!NOTE]
+    > [!NOTE]  
     > Maps can have only strings, ints, floats and bools as key type
 
 - ### Functions
@@ -179,7 +180,15 @@ It has an extremely easy language syntax, making it suitable for beginners new t
     |> if x == 2 { io.println("have 2"); } else if x == 3 { io.println("have 3"); }
     ```
 
-    It doesn't have support for `break` and `continue` yet
+    It even has the standard `break` and `continue` statements
+    ```
+    |> let x = 3;
+    
+    |> loop { if x == 0 { break; } io.println(x); x = x - 1; }
+    3
+    2
+    1
+    ```
 
 - ### Standard Library
 
