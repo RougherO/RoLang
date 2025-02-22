@@ -63,6 +63,7 @@ func New(lexer *lexer.Lexer) *Parser {
 		token.FLOAT:  {p.parseFloatLiteral, nil, NONE},
 		token.TRUE:   {p.parseBoolLiteral, nil, NONE},
 		token.FALSE:  {p.parseBoolLiteral, nil, NONE},
+		token.NULL:   {p.parseNullLiteral, nil, NONE},
 		token.BANG:   {p.parsePrefixExpression, nil, NONE},
 		token.MINUS:  {p.parsePrefixExpression, p.parseInfixExpression, SUM},
 		token.LPAREN: {p.parseGroupedExpression, p.parseCallExpression, POSTFIX},
@@ -684,6 +685,12 @@ func (p *Parser) parseBoolLiteral() ast.Expression {
 	return &ast.BoolLiteral{
 		Token: p.currToken,
 		Value: p.currToken.Type == token.TRUE,
+	}
+}
+
+func (p *Parser) parseNullLiteral() ast.Expression {
+	return &ast.NullLiteral{
+		Token: p.currToken,
 	}
 }
 

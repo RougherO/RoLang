@@ -34,6 +34,7 @@ if 5 < 10 {
 {"hello": "world"}
 loop x < 1 {}
 a.b
+null
 `
 
 	tests := []struct {
@@ -132,6 +133,7 @@ a.b
 		{token.IDENT, "a"},
 		{token.DOT, "."},
 		{token.IDENT, "b"},
+		{token.NULL, "null"},
 		{token.EOF, "eof"},
 	}
 

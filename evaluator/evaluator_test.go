@@ -158,6 +158,7 @@ func TestInfixOperator(t *testing.T) {
 		{"(1 > 2) == false", true},
 		{`"hello" + 1`, "hello1"},
 		{`1 + "hello" + 2.23`, "1hello2.23"},
+		{"null", nil},
 	}
 
 	for i, test := range tests {
@@ -378,6 +379,8 @@ func testPrimaryObject(t *testing.T, obj any, expect any) bool {
 		return testStringObject(t, obj, e)
 	case bool:
 		return testBooleanObject(t, obj, e)
+	case nil:
+		return obj == expect
 	default:
 		t.Errorf("type of e not handled. got=%T", e)
 		return false

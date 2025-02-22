@@ -144,6 +144,10 @@ type (
 		Token token.Token
 		Value bool
 	}
+
+	NullLiteral struct {
+		Token token.Token
+	}
 )
 
 func (p *Program) String() string {
@@ -440,3 +444,13 @@ func (bl *BoolLiteral) Location() token.SrcLoc {
 }
 
 func (bl *BoolLiteral) Expression() {}
+
+func (nl *NullLiteral) String() string {
+	return nl.Token.Word
+}
+
+func (nl *NullLiteral) Location() token.SrcLoc {
+	return nl.Token.Loc
+}
+
+func (nl *NullLiteral) Expression() {}

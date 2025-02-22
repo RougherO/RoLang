@@ -244,6 +244,8 @@ func (e *Evaluator) evalExpression(expression ast.Expression) (value any, err er
 		value, err = expr.Value, nil
 	case *ast.FunctionLiteral:
 		value, err = e.evalFunctionLiteral(expr)
+	case *ast.NullLiteral:
+		value, err = nil, nil
 	case *ast.CallExpression:
 		value, err = e.evalCallExpression(expr)
 	case *ast.IndexExpression:
@@ -758,8 +760,7 @@ func (e *Evaluator) evalEqOperator(left, right any) (any, error) {
 		case float64:
 			return float64(l) == r, nil
 		default:
-			return nil, fmt.Errorf("equality not supported for types %s and %s",
-				builtin.TypeStr(l), builtin.TypeStr(r))
+			return false, nil
 		}
 	case float64:
 		switch r := right.(type) {
@@ -768,40 +769,42 @@ func (e *Evaluator) evalEqOperator(left, right any) (any, error) {
 		case float64:
 			return l == r, nil
 		default:
-			return nil, fmt.Errorf("equality not supported for types %s and %s",
-				builtin.TypeStr(l), builtin.TypeStr(r))
+			return false, nil
 		}
 	case bool:
 		switch r := right.(type) {
 		case bool:
 			return l == r, nil
 		default:
-			return nil, fmt.Errorf("equality not supported for types %s and %s",
-				builtin.TypeStr(l), builtin.TypeStr(r))
+			return false, nil
 		}
 	case string:
 		switch r := right.(type) {
 		case string:
 			return l == r, nil
 		default:
-			return nil, fmt.Errorf("equality not supported for types %s and %s",
-				builtin.TypeStr(l), builtin.TypeStr(r))
+			return false, nil
 		}
 	case *objects.ArrayObject:
 		switch r := right.(type) {
 		case *objects.ArrayObject:
 			return slices.Equal(l.List, r.List), nil
 		default:
-			return nil, fmt.Errorf("equality not supported for types %s and %s",
-				builtin.TypeStr(l), builtin.TypeStr(r))
+			return false, nil
 		}
 	case *objects.MapObject:
 		switch r := right.(type) {
 		case *objects.MapObject:
 			return maps.Equal(l.Map, r.Map), nil
 		default:
-			return nil, fmt.Errorf("equality not supported for types %s and %s",
-				builtin.TypeStr(l), builtin.TypeStr(r))
+			return false, nil
+		}
+	case nil:
+		switch right.(type) {
+		case nil:
+			return true, nil
+		default:
+			return false, nil
 		}
 	default:
 		return nil, fmt.Errorf("equality not supported for %s", builtin.TypeStr(l))
