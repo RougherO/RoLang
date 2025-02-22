@@ -51,6 +51,8 @@ const (
 	ELSE   // "else"
 	LOOP   // "loop"
 	NULL   // "null"
+	BREAK  // "break"
+	CONT   // "continue"
 
 	TOTAL // total number of tokens
 )
@@ -90,6 +92,8 @@ var TokenString = []string{
 	COLON:  ":",
 	LOOP:   "loop",
 	NULL:   "null",
+	BREAK:  "break",
+	CONT:   "continue",
 }
 
 type Token struct {
@@ -99,15 +103,17 @@ type Token struct {
 }
 
 var keywords = map[string]TokenType{
-	"fn":     FN,
-	"return": RETURN,
-	"let":    LET,
-	"true":   TRUE,
-	"false":  FALSE,
-	"if":     IF,
-	"else":   ELSE,
-	"loop":   LOOP,
-	"null":   NULL,
+	"fn":       FN,
+	"return":   RETURN,
+	"let":      LET,
+	"true":     TRUE,
+	"false":    FALSE,
+	"if":       IF,
+	"else":     ELSE,
+	"loop":     LOOP,
+	"null":     NULL,
+	"break":    BREAK,
+	"continue": CONT,
 }
 
 func LookUpKeyword(word string) TokenType {

@@ -121,6 +121,10 @@ func (p *Parser) ParseStatement() ast.Statement {
 		return p.parseFunctionStatement()
 	case token.LOOP:
 		return p.parseLoopStatement()
+	case token.BREAK:
+		return p.parseJumpStatement(true)
+	case token.CONT:
+		return p.parseJumpStatement(false)
 	default:
 		return p.parseExpressionStatement()
 	}
@@ -216,6 +220,19 @@ func (p *Parser) parseLoopStatement() ast.Statement {
 	}
 
 	stmt.Body = body
+	return stmt
+}
+
+func (p *Parser) parseJumpStatement(isBreak bool) ast.Statement {
+	stmt := &ast.JumpStatement{
+		Token:   p.currToken,
+		IsBreak: isBreak,
+	}
+
+	if !p.expectToken(token.SEMCOL) {
+		return nil
+	}
+
 	return stmt
 }
 

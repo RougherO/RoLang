@@ -143,6 +143,32 @@ func TestLoopStatement(t *testing.T) {
 	}
 }
 
+func TestJumpStatement(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		{"break;", "break"},
+		{"continue;", "continue"},
+	}
+
+	for _, test := range tests {
+		l := lexer.New("parser_test_jump", test.input)
+		p := New(l)
+
+		stmt := p.ParseStatement()
+
+		jump, ok := stmt.(*ast.JumpStatement)
+		if !ok {
+			t.Fatalf("jump is not *ast.JumpStatement, got=%T", stmt)
+		}
+
+		if jump.Token.Word != test.expect {
+			t.Fatalf("jump is not %q. got=%q", test.expect, jump.Token.Word)
+		}
+	}
+}
+
 func TestFunctionStatement(t *testing.T) {
 	input := "fn add(x, y) { x + y; }"
 

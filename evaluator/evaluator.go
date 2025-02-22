@@ -30,7 +30,6 @@ func New() *Evaluator {
 }
 
 func (e *Evaluator) Evaluate(program *ast.Program) []error {
-	defer e.recoveryHandler()
 	e.errors = nil
 
 	err := e.evalStatements(program.Statements)
@@ -85,13 +84,16 @@ func (e *Evaluator) recoveryHandler() {
 				e.addError(fmt.Errorf("can only return integer exit codes at top level"))
 			}
 		case error:
-			e.addError(fmt.Errorf("runtime error:%v", e))
+			e.addError(fmt.Errorf("runtime error:%v", err))
 		}
 	}
 }
 
 func (e *Evaluator) errorDecorator(node ast.Node, err error) error {
 	if err != nil {
+		if _, ok := err.(objects.JumpObject); ok {
+			return err
+		}
 		return fmt.Errorf("\n%s %s", node.Location(), err)
 	}
 
@@ -99,6 +101,7 @@ func (e *Evaluator) errorDecorator(node ast.Node, err error) error {
 }
 
 func (e *Evaluator) evalStatements(stmts []ast.Statement) error {
+	defer e.recoveryHandler()
 	for _, stmt := range stmts {
 		err := e.evalStatement(stmt)
 		if err != nil {
@@ -132,6 +135,8 @@ func (e *Evaluator) evalStatement(statement ast.Statement) error {
 		_, err = e.evalExpression(stmt.Expression)
 	case *ast.LoopStatement:
 		err = e.evalLoopStatement(stmt)
+	case *ast.JumpStatement:
+		err = e.evalJumpStatement(stmt)
 	}
 
 	return e.errorDecorator(statement, err)
@@ -151,26 +156,46 @@ func (e *Evaluator) evalFunctionStatement(function *ast.FunctionStatement) error
 }
 
 func (e *Evaluator) evalLoopStatement(loop *ast.LoopStatement) error {
+	cond := true
 	for {
 		// should continue looping if there is no condition
 		// or check the condition repeatedly
-		expr, err := e.evalExpression(loop.Condition)
-		if err != nil {
-			return err
-		}
+		if loop.Condition != nil {
+			expr, err := e.evalExpression(loop.Condition)
+			if err != nil {
+				return err
+			}
 
-		cond := loop.Condition == nil || isTruthy(expr)
+			cond = isTruthy(expr)
+		}
+		// condition evaluates to false
 		if !cond {
 			break
 		}
 
-		err = e.evalStatement(loop.Body)
+		err := e.evalStatement(loop.Body)
 		if err != nil {
-			return err
+			stmt, ok := err.(objects.JumpObject)
+			if !ok {
+				return err
+			}
+
+			if stmt.IsBreak {
+				break
+			} else {
+				continue
+			}
 		}
 	}
 
 	return nil
+}
+
+func (p *Evaluator) evalJumpStatement(jump *ast.JumpStatement) error {
+	if jump.IsBreak {
+		return objects.JumpObject{IsBreak: true}
+	}
+	return objects.JumpObject{IsBreak: false}
 }
 
 func (e *Evaluator) evalLetStatement(let *ast.LetStatement) error {
@@ -370,8 +395,8 @@ func (e *Evaluator) evalCallArgs(args []ast.Expression) ([]any, error) {
 
 func (e *Evaluator) callFunction(function any, args []any) (retValue any, errValue error) {
 	switch obj := function.(type) {
-	case *objects.FuncObject:
-		returnRetriever := func() {
+	case objects.FuncObject:
+		returnHandler := func() {
 			e.resetEnv()
 
 			err := recover()
@@ -382,7 +407,7 @@ func (e *Evaluator) callFunction(function any, args []any) (retValue any, errVal
 				errValue = val
 			}
 		}
-		defer returnRetriever() // set return value or propagate error
+		defer returnHandler() // set return value or propagate error
 
 		// create new scope with the function's
 		e.setEnv(obj.Env)
@@ -413,8 +438,8 @@ func (e *Evaluator) callFunction(function any, args []any) (retValue any, errVal
 	}
 }
 
-func (e *Evaluator) evalFunctionLiteral(expr *ast.FunctionLiteral) (*objects.FuncObject, error) {
-	return &objects.FuncObject{
+func (e *Evaluator) evalFunctionLiteral(expr *ast.FunctionLiteral) (objects.FuncObject, error) {
+	return objects.FuncObject{
 		Env:      e.env,
 		Function: expr,
 	}, nil

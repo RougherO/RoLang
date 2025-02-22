@@ -9,6 +9,9 @@ import (
 )
 
 type (
+	JumpObject struct {
+		IsBreak bool
+	}
 	ReturnObject struct {
 		Value any
 	}
@@ -23,6 +26,13 @@ type (
 		Map map[any]any
 	}
 )
+
+func (o JumpObject) Error() string {
+	if o.IsBreak {
+		return "break"
+	}
+	return "continue"
+}
 
 func (o *ArrayObject) Insert(index int, e any) error {
 	if index < 0 || index > len(o.List) {

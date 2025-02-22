@@ -39,6 +39,11 @@ type (
 		Body      *BlockStatement
 	}
 
+	JumpStatement struct {
+		Token   token.Token // `break/continue` keyword
+		IsBreak bool        // break or continue statement
+	}
+
 	FunctionStatement struct {
 		Token token.Token
 		Ident *Identifier
@@ -207,6 +212,16 @@ func (ls *LoopStatement) Location() token.SrcLoc {
 }
 
 func (ls *LoopStatement) Statement() {}
+
+func (js *JumpStatement) String() string {
+	return js.Token.Word
+}
+
+func (js *JumpStatement) Location() token.SrcLoc {
+	return js.Token.Loc
+}
+
+func (js *JumpStatement) Statement() {}
 
 func (fs *FunctionStatement) String() string {
 	var params string

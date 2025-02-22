@@ -13,7 +13,7 @@ import (
 )
 
 const prompt = "|> "
-const message = `RoLang v0.4 Tree-Walk Interpreter`
+const message = `RoLang v0.5 Tree-Walk Interpreter`
 
 func checkError(errs []error) bool {
 	if len(errs) != 0 {

@@ -35,6 +35,8 @@ if 5 < 10 {
 loop x < 1 {}
 a.b
 null
+break
+continue
 `
 
 	tests := []struct {
@@ -134,6 +136,8 @@ null
 		{token.DOT, "."},
 		{token.IDENT, "b"},
 		{token.NULL, "null"},
+		{token.BREAK, "break"},
+		{token.CONT, "continue"},
 		{token.EOF, "eof"},
 	}
 
